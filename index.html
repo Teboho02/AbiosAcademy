@@ -1,35 +1,109 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-    <link rel="stylesheet" href="styles.css">
 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>
-
-        Teboho
+        Abios Academy Homepage
 
     </title>
 
-</head>
+    <style>
 
+
+
+        .inp{
+                display: flex;
+                border: 15px red;
+                align-items: center;
+                flex-direction: column
+
+
+        }
+
+        .inp > p{
+                color: cornflowerblue;
+                margin: 5px;
+        }
+        .inp > input{
+            color: cornflowerblue;
+            margin: 5px;
+
+        }
+
+        .navigation{
+                display: flex;
+                border-style: solid;
+                border-radius: 10px;
+                border-color: red;
+                align-items: center;
+
+        }
+     
+        
+
+    </style>
+
+
+</head>
 
 <body>
 
-    <nav style="align-items: center;margin: auto;">
 
-            <img src = "25694.png" class = "images" style="width:12px;height:12px">
-            <i>Abios academy</i>
-            <img src = "icons/images.png" class = "images" style="width: 12px;height: 12px;" id = "contact">
-        
-      
+    <nav class="navigation">
 
+        <p>Abios Academy </p>
 
+        <p>
+            about us
+        </p>
 
-
+        <img src="x.webp" style="width: 15px; height: 15px; margin-left: 20px;">
 
     </nav>
 
+    <section class="inp">
+
+            <p>username</p>
+            <input class="username" id="user">
+            <p>Password</p>
+            <input class="pass" type="password" id="pass">
+
+            <section>
+                <button>
+                    Sign in
+                </button>
+                <button>
+                    Create new account
+                </button>
+                
+            </section>
+
+    </section>
+
+    <script>
+            //
+
+            const req = new XMLHttpRequest();
+            req.onreadystatechange = function(){
+                if( this.readyState == 4 && this.status == 200){
+                        const respose = req.responseText;
+                        console.log(respose);
+
+                }
+            };
+
+            req.open("GET", "https://jsonplaceholder.typicode.com/users", true);
+            req.send();
+
+            
+
+
+
+    </script>
+
 
 </body>
+
 
 </html>
