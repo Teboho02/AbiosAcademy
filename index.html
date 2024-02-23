@@ -4,6 +4,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>
+        
         Abios Academy Homepage
 
     </title>
@@ -39,6 +40,18 @@
                 align-items: center;
 
         }
+        .buttons{
+            margin-top: 20px;
+       
+
+        }
+        .buttons > button{
+
+            border-radius: 10px;
+            border-color: aqua;
+            border-style: dotted;
+
+        } 
      
         
 
@@ -57,8 +70,10 @@
         <p>
             about us
         </p>
-
-        <img src="x.webp" style="width: 15px; height: 15px; margin-left: 20px;">
+        <p style="margin-left: 5px;">
+             Contact us
+        </p>
+        <img src="x.webp" style="width: 15px; height: 15px;">
 
     </nav>
 
@@ -69,8 +84,8 @@
             <p>Password</p>
             <input class="pass" type="password" id="pass">
 
-            <section>
-                <button>
+            <section class="buttons">
+                <button id="signin">
                     Sign in
                 </button>
                 <button>
@@ -84,21 +99,38 @@
     <script>
             //
 
-            const req = new XMLHttpRequest();
-            req.onreadystatechange = function(){
-                if( this.readyState == 4 && this.status == 200){
-                        const respose = req.responseText;
-                        console.log(respose);
 
+            const signin = document.getElementById("signin");
+            signin.addEventListener('click',function(){
+
+                console.log("sign in clicked");
+                const username = document.getElementById("user");
+                const password = document.getElementById("pass");
+                var validate = true;
+                if (!username.textContent ==="" &&!pass.textContent===""){
+
+
+                    const req = new XMLHttpRequest();
+                    req.onreadystatechange = function(){
+                        if( this.readyState == 4 && this.status == 200){
+                            const respose = req.responseText;
+                            console.log(respose);
                 }
             };
-
-            req.open("GET", "https://jsonplaceholder.typicode.com/users", true);
-            req.send();
-
-            
+                    let destinationurl = "https://jsonplaceholder.typicode.com/users";
+                    req.open("GET", destinationurl, true);
+                    req.send();
 
 
+                }
+                else{
+                    console.log("filll the other forms");
+
+                }
+
+                
+
+            });
 
     </script>
 
