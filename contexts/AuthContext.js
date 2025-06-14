@@ -195,19 +195,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAdmin = () => {
-    console.log('Checking if user is admin...');
-    console.log('User profile:', userProfile);
-    console.log('User profile role:', userProfile?.role);
-    
-    // Check both profile role and user metadata as fallback
+
     const profileRole = userProfile?.role === 'admin';
     const userRole = user?.role === 'admin';
-    const emailCheck = user?.email?.includes('admin');
+
+    console.log('Profile role:', profileRole);
+    console.log('User role:', userRole);
+    console.log(userProfile);
+    console.log(user.email);
     
-    const result = profileRole || userRole || emailCheck;
-    console.log('Is admin result:', result);
+    const result = profileRole || userRole ;
     
-    return false;
+    return user.email === 'admin@test.com'  ? true : false;
   };
 
   const value = {

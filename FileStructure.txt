@@ -1,6 +1,5 @@
 .
 |-- App.js
-|-- FileStructure.txt
 |-- app.json
 |-- assets
 |   |-- adaptive-icon.png
@@ -9,18 +8,30 @@
 |   |-- icon.png
 |   |-- placeholder1.jpg
 |   |-- placeholder2.jpg
-|   `-- placeholder3.jpg
+|   |-- placeholder3 copy.jpg
+|   |-- placeholder3.jpg
+|   |-- splash-icon copy.png
+|   `-- splash-icon.png
 |-- components
 |   |-- Home
 |   |   `-- Home.js
+|   |-- Settings
+|   |   `-- Settings.js
 |   |-- admin
 |   |   |-- AdminDashboard.js
-|   |   `-- AdminHome.js
+|   |   |-- AdminHome.js
+|   |   `-- AdminHoneStyles.js
 |   `-- auth
 |       |-- login.js
 |       `-- signup.js
+|-- contexts
+|   `-- AuthContext.js
+|-- eas.json
+|-- fileStructure.txt
 |-- index.js
+|-- lib
+|   `-- supabase.js
 |-- package.json
 `-- yarn.lock
 
-5 directories, 18 files
+8 directories, 26 files
