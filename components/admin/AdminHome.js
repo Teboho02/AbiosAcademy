@@ -3,9 +3,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons, FontAwesome, AntDesign, Ionicons, Entypo } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const AdminHome = () => {
   const navigation = useNavigation();
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -40,63 +42,63 @@ const AdminHome = () => {
 
   const renderDashboard = () => (
     <View style={styles.dashboardContainer}>
-      <Text style={styles.sectionTitle}>Dashboard Overview</Text>
-      
+      <Text style={[styles.sectionTitle, {color: theme.text}]}>Dashboard Overview</Text>
+
       <View style={styles.statsContainer}>
-        <View style={[styles.statCard, {backgroundColor: '#4e7bff'}]}>
+        <View style={[styles.statCard, {backgroundColor: theme.primary}]}>
           <Ionicons name="people" size={30} color="white" />
           <Text style={styles.statNumber}>{stats.totalUsers}</Text>
           <Text style={styles.statLabel}>Total Users</Text>
         </View>
-        
-        <View style={[styles.statCard, {backgroundColor: '#ff6b6b'}]}>
+
+        <View style={[styles.statCard, {backgroundColor: theme.error}]}>
           <Ionicons name="person" size={30} color="white" />
           <Text style={styles.statNumber}>{stats.activeUsers}</Text>
           <Text style={styles.statLabel}>Active Users</Text>
         </View>
-        
-        <View style={[styles.statCard, {backgroundColor: '#6bdb7d'}]}>
+
+        <View style={[styles.statCard, {backgroundColor: theme.success}]}>
           <Ionicons name="barbell" size={30} color="white" />
           <Text style={styles.statNumber}>{stats.exercises}</Text>
           <Text style={styles.statLabel}>Exercises</Text>
         </View>
-        
-        <View style={[styles.statCard, {backgroundColor: '#ffb347'}]}>
+
+        <View style={[styles.statCard, {backgroundColor: theme.warning}]}>
           <Ionicons name="videocam" size={30} color="white" />
           <Text style={styles.statNumber}>{stats.videoMinutes}</Text>
           <Text style={styles.statLabel}>Minutes of Video</Text>
         </View>
       </View>
-      
-      <Text style={styles.sectionTitle}>Recent Activity</Text>
-      <View style={styles.activityContainer}>
-        <View style={styles.activityItem}>
-          <View style={styles.activityIcon}>
-            <FontAwesome name="user-plus" size={18} color="#4e7bff" />
+
+      <Text style={[styles.sectionTitle, {color: theme.text}]}>Recent Activity</Text>
+      <View style={[styles.activityContainer, {backgroundColor: theme.cardBackground}]}>
+        <View style={[styles.activityItem, {borderBottomColor: theme.border}]}>
+          <View style={[styles.activityIcon, {backgroundColor: theme.primary + '20'}]}>
+            <FontAwesome name="user-plus" size={18} color={theme.primary} />
           </View>
           <View>
-            <Text style={styles.activityText}>12 new users joined today</Text>
-            <Text style={styles.activityTime}>2 hours ago</Text>
+            <Text style={[styles.activityText, {color: theme.text}]}>12 new users joined today</Text>
+            <Text style={[styles.activityTime, {color: theme.textSecondary}]}>2 hours ago</Text>
           </View>
         </View>
-        
-        <View style={styles.activityItem}>
-          <View style={styles.activityIcon}>
-            <Ionicons name="videocam" size={18} color="#ff6b6b" />
+
+        <View style={[styles.activityItem, {borderBottomColor: theme.border}]}>
+          <View style={[styles.activityIcon, {backgroundColor: theme.error + '20'}]}>
+            <Ionicons name="videocam" size={18} color={theme.error} />
           </View>
           <View>
-            <Text style={styles.activityText}>You uploaded a new workout video</Text>
-            <Text style={styles.activityTime}>Yesterday</Text>
+            <Text style={[styles.activityText, {color: theme.text}]}>You uploaded a new workout video</Text>
+            <Text style={[styles.activityTime, {color: theme.textSecondary}]}>Yesterday</Text>
           </View>
         </View>
-        
-        <View style={styles.activityItem}>
-          <View style={styles.activityIcon}>
-            <Entypo name="star" size={18} color="#ffb347" />
+
+        <View style={[styles.activityItem, {borderBottomColor: theme.border}]}>
+          <View style={[styles.activityIcon, {backgroundColor: theme.warning + '20'}]}>
+            <Entypo name="star" size={18} color={theme.warning} />
           </View>
           <View>
-            <Text style={styles.activityText}>HIIT Workout received 24 new ratings</Text>
-            <Text style={styles.activityTime}>2 days ago</Text>
+            <Text style={[styles.activityText, {color: theme.text}]}>HIIT Workout received 24 new ratings</Text>
+            <Text style={[styles.activityTime, {color: theme.textSecondary}]}>2 days ago</Text>
           </View>
         </View>
       </View>
@@ -107,49 +109,51 @@ const AdminHome = () => {
     <View style={styles.exercisesContainer}>
       <View style={styles.searchContainer}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, {backgroundColor: theme.inputBackground, color: theme.text, borderColor: theme.inputBorder}]}
           placeholder="Search exercises..."
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddExercise}>
+        <TouchableOpacity style={[styles.addButton, {backgroundColor: theme.primary}]} onPress={handleAddExercise}>
           <AntDesign name="plus" size={20} color="white" />
           <Text style={styles.addButtonText}>Add Exercise</Text>
         </TouchableOpacity>
       </View>
-      
+
       <ScrollView style={styles.exerciseList}>
         {exercises.map(exercise => (
-          <View key={exercise.id} style={styles.exerciseCard}>
-            <View style={styles.exerciseThumbnail}>
-              <Ionicons name="barbell" size={24} color="#4e7bff" />
+          <View key={exercise.id} style={[styles.exerciseCard, {backgroundColor: theme.cardBackground}]}>
+            <View style={[styles.exerciseThumbnail, {backgroundColor: theme.primary + '20'}]}>
+              <Ionicons name="barbell" size={24} color={theme.primary} />
             </View>
             <View style={styles.exerciseDetails}>
-              <Text style={styles.exerciseTitle}>{exercise.title}</Text>
+              <Text style={[styles.exerciseTitle, {color: theme.text}]}>{exercise.title}</Text>
               <View style={styles.exerciseMeta}>
-                <Text style={styles.exerciseCategory}>{exercise.category}</Text>
-                <Text style={styles.exerciseDuration}>{exercise.duration}</Text>
-                <Text style={[styles.exerciseDifficulty, 
-                             {color: exercise.difficulty === 'Beginner' ? '#6bdb7d' : 
-                                      exercise.difficulty === 'Intermediate' ? '#ffb347' : '#ff6b6b'}]}>
+                <Text style={[styles.exerciseCategory, {backgroundColor: theme.primary + '20', color: theme.primary}]}>{exercise.category}</Text>
+                <Text style={[styles.exerciseDuration, {backgroundColor: theme.success + '20', color: theme.success}]}>{exercise.duration}</Text>
+                <Text style={[styles.exerciseDifficulty,
+                             {color: exercise.difficulty === 'Beginner' ? theme.success :
+                                      exercise.difficulty === 'Intermediate' ? theme.warning : theme.error,
+                              backgroundColor: exercise.difficulty === 'Beginner' ? theme.success + '20' :
+                                      exercise.difficulty === 'Intermediate' ? theme.warning + '20' : theme.error + '20'}]}>
                   {exercise.difficulty}
                 </Text>
               </View>
               <View style={styles.exerciseViews}>
-                <Ionicons name="eye" size={16} color="#777" />
-                <Text style={styles.viewsText}>{exercise.views} views</Text>
+                <Ionicons name="eye" size={16} color={theme.textSecondary} />
+                <Text style={[styles.viewsText, {color: theme.textSecondary}]}>{exercise.views} views</Text>
               </View>
             </View>
             <View style={styles.exerciseActions}>
               <TouchableOpacity style={styles.actionButton}>
-                <FontAwesome name="pencil" size={16} color="#4e7bff" />
+                <FontAwesome name="pencil" size={16} color={theme.primary} />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionButton} 
+              <TouchableOpacity
+                style={styles.actionButton}
                 onPress={() => handleDeleteExercise(exercise.id)}
               >
-                <FontAwesome name="trash" size={16} color="#ff6b6b" />
+                <FontAwesome name="trash" size={16} color={theme.error} />
               </TouchableOpacity>
             </View>
           </View>
@@ -160,21 +164,21 @@ const AdminHome = () => {
 
   const renderUsers = () => (
     <View style={styles.usersContainer}>
-      <Text style={styles.sectionTitle}>Active Users</Text>
-      
+      <Text style={[styles.sectionTitle, {color: theme.text}]}>Active Users</Text>
+
       <View style={styles.userList}>
         {users.map(user => (
-          <View key={user.id} style={styles.userCard}>
-            <View style={styles.userAvatar}>
-              <FontAwesome name="user" size={24} color="#4e7bff" />
+          <View key={user.id} style={[styles.userCard, {backgroundColor: theme.cardBackground}]}>
+            <View style={[styles.userAvatar, {backgroundColor: theme.primary + '20'}]}>
+              <FontAwesome name="user" size={24} color={theme.primary} />
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{user.name}</Text>
-              <Text style={styles.userJoined}>Joined: {user.joined}</Text>
+              <Text style={[styles.userName, {color: theme.text}]}>{user.name}</Text>
+              <Text style={[styles.userJoined, {color: theme.textSecondary}]}>Joined: {user.joined}</Text>
             </View>
             <View style={styles.userStats}>
-              <Text style={styles.workoutCount}>{user.workouts}</Text>
-              <Text style={styles.workoutLabel}>Workouts</Text>
+              <Text style={[styles.workoutCount, {color: theme.primary}]}>{user.workouts}</Text>
+              <Text style={[styles.workoutLabel, {color: theme.textSecondary}]}>Workouts</Text>
             </View>
           </View>
         ))}
@@ -183,77 +187,77 @@ const AdminHome = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: theme.background}]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, {backgroundColor: theme.cardBackground, borderBottomColor: theme.border}]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.appTitle}>Abios Academy</Text>
-          <Text style={styles.adminTitle}>Admin Dashboard</Text>
+          <Text style={[styles.appTitle, {color: theme.text}]}>Abios Academy</Text>
+          <Text style={[styles.adminTitle, {color: theme.textSecondary}]}>Admin Dashboard</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications" size={24} color="#333" />
-            <View style={styles.notificationBadge} />
+            <Ionicons name="notifications" size={24} color={theme.text} />
+            <View style={[styles.notificationBadge, {backgroundColor: theme.error}]} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.profileButton}>
-            <FontAwesome name="user-circle" size={32} color="#4e7bff" />
+            <FontAwesome name="user-circle" size={32} color={theme.primary} />
           </TouchableOpacity>
         </View>
       </View>
-      
+
       {/* Search Bar */}
-      <View style={styles.searchBar}>
-        <MaterialIcons name="search" size={24} color="#999" />
+      <View style={[styles.searchBar, {backgroundColor: theme.cardBackground}]}>
+        <MaterialIcons name="search" size={24} color={theme.textSecondary} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, {color: theme.text}]}
           placeholder="Search dashboard..."
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textSecondary}
         />
       </View>
-      
+
       {/* Navigation Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'dashboard' && styles.activeTab]}
+      <View style={[styles.tabContainer, {backgroundColor: theme.cardBackground}]}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'dashboard' && {backgroundColor: theme.primary + '20'}]}
           onPress={() => setActiveTab('dashboard')}
         >
-          <Ionicons name="grid" size={20} color={activeTab === 'dashboard' ? '#4e7bff' : '#777'} />
-          <Text style={[styles.tabText, activeTab === 'dashboard' && styles.activeTabText]}>
+          <Ionicons name="grid" size={20} color={activeTab === 'dashboard' ? theme.primary : theme.textSecondary} />
+          <Text style={[styles.tabText, {color: activeTab === 'dashboard' ? theme.primary : theme.textSecondary}]}>
             Dashboard
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'exercises' && styles.activeTab]}
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'exercises' && {backgroundColor: theme.primary + '20'}]}
           onPress={() => setActiveTab('exercises')}
         >
-          <Ionicons name="barbell" size={20} color={activeTab === 'exercises' ? '#4e7bff' : '#777'} />
-          <Text style={[styles.tabText, activeTab === 'exercises' && styles.activeTabText]}>
+          <Ionicons name="barbell" size={20} color={activeTab === 'exercises' ? theme.primary : theme.textSecondary} />
+          <Text style={[styles.tabText, {color: activeTab === 'exercises' ? theme.primary : theme.textSecondary}]}>
             Exercises
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'users' && {backgroundColor: theme.primary + '20'}]}
           onPress={() => setActiveTab('users')}
         >
-          <Ionicons name="people" size={20} color={activeTab === 'users' ? '#4e7bff' : '#777'} />
-          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
+          <Ionicons name="people" size={20} color={activeTab === 'users' ? theme.primary : theme.textSecondary} />
+          <Text style={[styles.tabText, {color: activeTab === 'users' ? theme.primary : theme.textSecondary}]}>
             Users
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'analytics' && styles.activeTab]}
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'analytics' && {backgroundColor: theme.primary + '20'}]}
           onPress={() => setActiveTab('analytics')}
         >
-          <Ionicons name="stats-chart" size={20} color={activeTab === 'analytics' ? '#4e7bff' : '#777'} />
-          <Text style={[styles.tabText, activeTab === 'analytics' && styles.activeTabText]}>
+          <Ionicons name="stats-chart" size={20} color={activeTab === 'analytics' ? theme.primary : theme.textSecondary} />
+          <Text style={[styles.tabText, {color: activeTab === 'analytics' ? theme.primary : theme.textSecondary}]}>
             Analytics
           </Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Content Area */}
       <ScrollView style={styles.contentContainer}>
         {activeTab === 'dashboard' && renderDashboard()}
@@ -261,17 +265,17 @@ const AdminHome = () => {
         {activeTab === 'users' && renderUsers()}
         {activeTab === 'analytics' && (
           <View style={styles.analyticsContainer}>
-            <Text style={styles.sectionTitle}>Coming Soon</Text>
-            <Text style={styles.comingSoonText}>Detailed analytics will be available in the next update</Text>
-            <View style={styles.comingSoonPlaceholder}>
-              <Ionicons name="stats-chart" size={60} color="#4e7bff" />
+            <Text style={[styles.sectionTitle, {color: theme.text}]}>Coming Soon</Text>
+            <Text style={[styles.comingSoonText, {color: theme.textSecondary}]}>Detailed analytics will be available in the next update</Text>
+            <View style={[styles.comingSoonPlaceholder, {backgroundColor: theme.primary + '20'}]}>
+              <Ionicons name="stats-chart" size={60} color={theme.primary} />
             </View>
           </View>
         )}
       </ScrollView>
-      
+
       {/* Add Button */}
-      <TouchableOpacity style={styles.floatingButton} onPress={handleAddExercise}>
+      <TouchableOpacity style={[styles.floatingButton, {backgroundColor: theme.primary}]} onPress={handleAddExercise}>
         <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
     </View>
@@ -281,7 +285,6 @@ const AdminHome = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fd',
   },
   header: {
     flexDirection: 'row',
@@ -289,19 +292,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 50,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   headerLeft: {},
   appTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
   },
   adminTitle: {
     fontSize: 16,
-    color: '#777',
     marginTop: 4,
   },
   headerRight: {
@@ -319,13 +318,11 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#ff6b6b',
   },
   profileButton: {},
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     margin: 20,
     marginBottom: 10,
     borderRadius: 10,
@@ -341,7 +338,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 10,
     fontSize: 16,
-    color: '#333',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -349,7 +345,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 10,
     marginBottom: 20,
-    backgroundColor: 'white',
     borderRadius: 10,
     paddingVertical: 10,
     shadowColor: '#000',
@@ -363,16 +358,12 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
   },
-  activeTab: {
-    backgroundColor: '#eef4ff',
-  },
+  activeTab: {},
   tabText: {
     marginTop: 5,
     fontSize: 12,
-    color: '#777',
   },
   activeTabText: {
-    color: '#4e7bff',
     fontWeight: '600',
   },
   contentContainer: {
@@ -384,7 +375,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 20,
   },
   statsContainer: {
@@ -411,7 +401,6 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   activityContainer: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
   },
@@ -419,25 +408,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   activityIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f5ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
   },
   activityText: {
     fontSize: 16,
-    color: '#333',
     marginBottom: 4,
   },
   activityTime: {
     fontSize: 14,
-    color: '#999',
   },
   exercisesContainer: {
     flex: 1,
@@ -448,11 +433,9 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: 'white',
     borderRadius: 10,
     padding: 15,
     fontSize: 16,
-    color: '#333',
     marginRight: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -462,7 +445,6 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flexDirection: 'row',
-    backgroundColor: '#4e7bff',
     borderRadius: 10,
     padding: 15,
     alignItems: 'center',
@@ -478,7 +460,6 @@ const styles = StyleSheet.create({
   },
   exerciseCard: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 15,
     marginBottom: 15,
@@ -493,7 +474,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 10,
-    backgroundColor: '#f0f5ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -504,7 +484,6 @@ const styles = StyleSheet.create({
   exerciseTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 5,
   },
   exerciseMeta: {
@@ -512,8 +491,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   exerciseCategory: {
-    backgroundColor: '#eef4ff',
-    color: '#4e7bff',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 20,
@@ -521,8 +498,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   exerciseDuration: {
-    backgroundColor: '#f0f8f1',
-    color: '#6bdb7d',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 20,
@@ -534,7 +509,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 20,
     fontSize: 12,
-    backgroundColor: '#fff9f0',
   },
   exerciseViews: {
     flexDirection: 'row',
@@ -542,7 +516,6 @@ const styles = StyleSheet.create({
   },
   viewsText: {
     marginLeft: 5,
-    color: '#777',
     fontSize: 14,
   },
   exerciseActions: {
@@ -557,7 +530,6 @@ const styles = StyleSheet.create({
   userList: {},
   userCard: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 15,
     marginBottom: 15,
@@ -572,7 +544,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#f0f5ff',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -583,12 +554,10 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 5,
   },
   userJoined: {
     fontSize: 14,
-    color: '#999',
   },
   userStats: {
     alignItems: 'center',
@@ -596,11 +565,9 @@ const styles = StyleSheet.create({
   workoutCount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#4e7bff',
   },
   workoutLabel: {
     fontSize: 12,
-    color: '#999',
   },
   analyticsContainer: {
     alignItems: 'center',
@@ -609,7 +576,6 @@ const styles = StyleSheet.create({
   },
   comingSoonText: {
     fontSize: 18,
-    color: '#777',
     textAlign: 'center',
     marginBottom: 30,
   },
@@ -617,7 +583,6 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: '#f0f5ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -628,7 +593,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#4e7bff',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

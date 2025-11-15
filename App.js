@@ -3,9 +3,14 @@ import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { DownloadProvider } from './contexts/DownloadContext';
+import { FavoritesProvider } from './contexts/FavoritesContext';
+import { WorkoutHistoryProvider } from './contexts/WorkoutHistoryContext';
 
 import Login from './components/auth/login';
 import Signup from './components/auth/signup';
+import ForgotPassword from './components/auth/forgotPassword';
 import Home from './components/Home/Home';
 import AdminHome from './components/admin/AdminHome';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -15,25 +20,30 @@ console.log('App component rendering...');
 const Stack = createNativeStackNavigator();
 
 // Loading component
-const LoadingScreen = () => (
-  <View style={styles.loadingContainer}>
-    <ActivityIndicator size="large" color="#4e7bff" />
-    <Text style={styles.loadingText}>Loading...</Text>
-  </View>
-);
+const LoadingScreen = () => {
+  const { theme } = useTheme();
+
+  return (
+    <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+      <ActivityIndicator size="large" color={theme.primary} />
+      <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading...</Text>
+    </View>
+  );
+};
 
 const AppNavigator = () => {
   const { user, loading, isAdmin } = useAuth();
+  const { theme } = useTheme();
 
   if (loading) {
     return <LoadingScreen />;
   }
 
   return (
-    <Stack.Navigator 
+    <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#fff' }
+        contentStyle: { backgroundColor: theme.background }
       }}
     >
       {!user ? (
@@ -41,6 +51,7 @@ const AppNavigator = () => {
         <>
           <Stack.Screen name="Login" component={Login} />
           <Stack.Screen name="Signup" component={Signup} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
         </>
       ) : (
         // App stack - user logged in
@@ -56,12 +67,20 @@ const AppNavigator = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <AppNavigator />
-        <StatusBar style="auto" />
-      </NavigationContainer>
-    </AuthProvider>
+    <ThemeProvider>
+      <FavoritesProvider>
+        <WorkoutHistoryProvider>
+          <DownloadProvider>
+            <AuthProvider>
+              <NavigationContainer>
+                <AppNavigator />
+                <StatusBar style="auto" />
+              </NavigationContainer>
+            </AuthProvider>
+          </DownloadProvider>
+        </WorkoutHistoryProvider>
+      </FavoritesProvider>
+    </ThemeProvider>
   );
 }
 

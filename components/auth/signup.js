@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 function Signup() {
   const [name, setName] = useState('');
@@ -11,6 +12,7 @@ function Signup() {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const { signUp } = useAuth();
+  const { theme } = useTheme();
 
   const validateForm = () => {
     if (!name.trim()) {
@@ -90,8 +92,10 @@ function Signup() {
     navigation.navigate('Login');
   };
 
+  const styles = createStyles(theme);
+
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
@@ -105,18 +109,18 @@ function Signup() {
           <TextInput
             style={styles.input}
             placeholder="Full Name"
-            placeholderTextColor="#888"
+            placeholderTextColor={theme.textSecondary}
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
             autoComplete="name"
             editable={!loading}
           />
-          
+
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#888"
+            placeholderTextColor={theme.textSecondary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -124,11 +128,11 @@ function Signup() {
             autoComplete="email"
             editable={!loading}
           />
-          
+
           <TextInput
             style={styles.input}
             placeholder="Password (min 6 characters)"
-            placeholderTextColor="#888"
+            placeholderTextColor={theme.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -136,11 +140,11 @@ function Signup() {
             autoComplete="new-password"
             editable={!loading}
           />
-          
+
           <TextInput
             style={styles.input}
             placeholder="Confirm Password"
-            placeholderTextColor="#888"
+            placeholderTextColor={theme.textSecondary}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
@@ -150,8 +154,8 @@ function Signup() {
           />
         </View>
 
-        <TouchableOpacity 
-          style={[styles.signupButton, loading && styles.disabledButton]} 
+        <TouchableOpacity
+          style={[styles.signupButton, loading && styles.disabledButton]}
           onPress={handleSignup}
           disabled={loading}
         >
@@ -159,7 +163,7 @@ function Signup() {
             {loading ? 'Creating Account...' : 'Create Account'}
           </Text>
         </TouchableOpacity>
-        
+
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>Already have an account? </Text>
           <TouchableOpacity onPress={navigateToLogin} disabled={loading}>
@@ -177,10 +181,10 @@ function Signup() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.background,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -194,12 +198,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 18,
-    color: '#666',
+    color: theme.textSecondary,
   },
   inputContainer: {
     marginBottom: 20,
@@ -208,18 +212,18 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     height: 50,
-    borderColor: '#ddd',
+    borderColor: theme.inputBorder,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 15,
     marginBottom: 20,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: 'white',
+    color: theme.text,
+    backgroundColor: theme.inputBackground,
   },
   signupButton: {
     width: '100%',
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     padding: 16,
     borderRadius: 10,
     alignItems: 'center',
@@ -244,11 +248,11 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   loginText: {
-    color: '#666',
+    color: theme.textSecondary,
     fontSize: 16,
   },
   loginLink: {
-    color: '#4e7bff',
+    color: theme.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -258,7 +262,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
   },

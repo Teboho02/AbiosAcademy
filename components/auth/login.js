@@ -2,6 +2,7 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'reac
 import React, { useState } from 'react';
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -9,6 +10,8 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
   const { signIn } = useAuth();
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -52,7 +55,7 @@ function Login() {
         <TextInput
           style={styles.input}
           placeholder="Email"
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.textSecondary}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -60,11 +63,11 @@ function Login() {
           autoComplete="email"
           editable={!loading}
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Password"
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.textSecondary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -84,9 +87,9 @@ function Login() {
         </Text>
       </TouchableOpacity>
       
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.forgotPassword}
-        onPress={() => Alert.alert('Info', 'Password reset feature coming soon!')}
+        onPress={() => navigation.navigate('ForgotPassword')}
         disabled={loading}
       >
         <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
@@ -109,11 +112,11 @@ function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.background,
     padding: 25,
   },
   header: {
@@ -123,12 +126,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 18,
-    color: '#666',
+    color: theme.textSecondary,
   },
   inputContainer: {
     marginBottom: 20,
@@ -136,18 +139,18 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     height: 50,
-    borderColor: '#ddd',
+    borderColor: theme.inputBorder,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 15,
     marginBottom: 20,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: 'white',
+    color: theme.text,
+    backgroundColor: theme.inputBackground,
   },
   loginButton: {
     width: '100%',
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     padding: 16,
     borderRadius: 10,
     alignItems: 'center',
@@ -159,7 +162,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.textSecondary,
   },
   buttonText: {
     color: 'white',
@@ -171,7 +174,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   forgotPasswordText: {
-    color: '#4e7bff',
+    color: theme.primary,
     fontSize: 16,
   },
   signupContainer: {
@@ -180,31 +183,31 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   signupText: {
-    color: '#666',
+    color: theme.textSecondary,
     fontSize: 16,
   },
   signupLink: {
-    color: '#4e7bff',
+    color: theme.primary,
     fontSize: 16,
     fontWeight: '600',
   },
   testAccountInfo: {
     marginTop: 40,
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderRadius: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#4e7bff',
+    borderLeftColor: theme.primary,
   },
   testAccountTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   testAccountText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.textSecondary,
     marginBottom: 4,
   },
 });

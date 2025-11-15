@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { 
-  Text, 
-  TouchableOpacity, 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  Alert, 
+import {
+  Text,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  ScrollView,
+  Alert,
   RefreshControl,
   Image,
   Dimensions,
@@ -17,13 +17,30 @@ import {
 import { Video } from 'expo-av';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useDownload } from '../../contexts/DownloadContext';
+import { useFavorites } from '../../contexts/FavoritesContext';
+import { useWorkoutHistory } from '../../contexts/WorkoutHistoryContext';
 import { dbService } from '../../lib/supabase';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import Downloads from '../Downloads/Downloads';
+import EditProfile from '../Profile/EditProfile';
 
 const { width, height } = Dimensions.get('window');
 
 // Memoized Video Player Modal Component
-const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
+const VideoPlayerModal = React.memo(({
+  visible,
+  exercise,
+  onClose,
+  theme,
+  isDownloaded,
+  isDownloading,
+  downloadProgress,
+  getDownloadedVideoUri,
+  downloadVideo,
+  addWorkout
+}) => {
   const [status, setStatus] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const videoRef = React.useRef(null);
@@ -49,12 +66,36 @@ const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
     }
   }, []);
 
+  const handleDownload = useCallback(async () => {
+    if (!exercise) return;
+
+    try {
+      await downloadVideo(exercise);
+    } catch (error) {
+      console.error('Download error:', error);
+      Alert.alert('Download Failed', 'Failed to download video. Please try again.');
+    }
+  }, [exercise, downloadVideo]);
+
+  // Get the video URI - use local if downloaded, otherwise remote
+  const videoUri = React.useMemo(() => {
+    if (!exercise) return null;
+    if (isDownloaded(exercise.id)) {
+      return getDownloadedVideoUri(exercise.id);
+    }
+    return exercise.video_url;
+  }, [exercise, isDownloaded, getDownloadedVideoUri]);
+
   React.useEffect(() => {
     if (visible && exercise?.video_url) {
       // Increment view count when video is opened
       dbService.incrementExerciseViews(exercise.id).catch(console.error);
+      // Track workout when video is opened
+      if (addWorkout && exercise) {
+        addWorkout(exercise);
+      }
     }
-  }, [visible, exercise]);
+  }, [visible, exercise, addWorkout]);
 
   // Reset loading state when modal opens/closes
   React.useEffect(() => {
@@ -74,7 +115,7 @@ const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
     >
       <View style={styles.videoModalContainer}>
         <StatusBar hidden />
-        
+
         {/* Header */}
         <View style={styles.videoModalHeader}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -88,16 +129,34 @@ const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
               {exercise?.category} • {exercise?.duration} • {exercise?.difficulty}
             </Text>
           </View>
+          {/* Download Button */}
+          {exercise && (
+            <TouchableOpacity
+              onPress={handleDownload}
+              style={styles.headerDownloadButton}
+              disabled={isDownloaded(exercise.id) || isDownloading(exercise.id)}
+            >
+              {isDownloading(exercise.id) ? (
+                <View style={styles.downloadingIndicator}>
+                  <ActivityIndicator size="small" color="white" />
+                </View>
+              ) : isDownloaded(exercise.id) ? (
+                <Ionicons name="checkmark-circle" size={28} color="#4ade80" />
+              ) : (
+                <Ionicons name="download-outline" size={28} color="white" />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Video Player */}
         <View style={styles.videoContainer}>
-          {exercise?.video_url ? (
+          {videoUri ? (
             <>
               <Video
                 ref={videoRef}
                 style={styles.video}
-                source={{ uri: exercise.video_url }}
+                source={{ uri: videoUri }}
                 useNativeControls
                 resizeMode="contain"
                 shouldPlay={false}
@@ -105,7 +164,7 @@ const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
                 onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
                 onFullscreenUpdate={handleFullscreenUpdate}
               />
-              
+
               {isLoading && (
                 <View style={styles.videoLoadingOverlay}>
                   <ActivityIndicator size="large" color="white" />
@@ -115,32 +174,32 @@ const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
             </>
           ) : (
             <View style={styles.noVideoContainer}>
-              <Ionicons name="videocam-off" size={64} color="#666" />
-              <Text style={styles.noVideoText}>Video not available</Text>
+              <Ionicons name="videocam-off" size={64} color={theme.textSecondary} />
+              <Text style={[styles.noVideoText, { color: theme.textSecondary }]}>Video not available</Text>
             </View>
           )}
         </View>
 
         {/* Exercise Details */}
-        <View style={styles.videoDetailsContainer}>
+        <View style={[styles.videoDetailsContainer, { backgroundColor: theme.cardBackground }]}>
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.exerciseDescriptionTitle}>About this exercise</Text>
-            <Text style={styles.exerciseDescriptionText}>
+            <Text style={[styles.exerciseDescriptionTitle, { color: theme.text }]}>About this exercise</Text>
+            <Text style={[styles.exerciseDescriptionText, { color: theme.textSecondary }]}>
               {exercise?.description || 'No description available.'}
             </Text>
-            
+
             <View style={styles.exerciseMetaContainer}>
               <View style={styles.metaItem}>
-                <Ionicons name="time" size={20} color="#4e7bff" />
-                <Text style={styles.metaText}>{exercise?.duration}</Text>
+                <Ionicons name="time" size={20} color={theme.primary} />
+                <Text style={[styles.metaText, { color: theme.text }]}>{exercise?.duration}</Text>
               </View>
               <View style={styles.metaItem}>
-                <Ionicons name="fitness" size={20} color="#4e7bff" />
-                <Text style={styles.metaText}>{exercise?.difficulty}</Text>
+                <Ionicons name="fitness" size={20} color={theme.primary} />
+                <Text style={[styles.metaText, { color: theme.text }]}>{exercise?.difficulty}</Text>
               </View>
               <View style={styles.metaItem}>
-                <Ionicons name="eye" size={20} color="#4e7bff" />
-                <Text style={styles.metaText}>{exercise?.views || 0} views</Text>
+                <Ionicons name="eye" size={20} color={theme.primary} />
+                <Text style={[styles.metaText, { color: theme.text }]}>{exercise?.views || 0} views</Text>
               </View>
             </View>
           </ScrollView>
@@ -151,51 +210,120 @@ const VideoPlayerModal = React.memo(({ visible, exercise, onClose }) => {
 });
 
 // Memoized Exercise Card Component
-const ExerciseCard = React.memo(({ exercise, onPress, style }) => (
-  <TouchableOpacity 
-    style={[styles.exerciseCard, style]}
-    onPress={() => onPress(exercise)}
-    activeOpacity={0.8}
-  >
-    <View style={styles.exerciseImageContainer}>
-      <Image 
-        source={
-          exercise.thumbnail_url 
-            ? { uri: exercise.thumbnail_url }
-            : require('../../assets/placeholder1.jpg')
-        } 
-        style={styles.exerciseImage}
-        defaultSource={require('../../assets/placeholder1.jpg')}
-      />
-      <View style={styles.playOverlay}>
-        <Ionicons name="play-circle" size={32} color="white" />
+const ExerciseCard = React.memo(({
+  exercise,
+  onPress,
+  style,
+  theme,
+  isDownloaded,
+  isDownloading,
+  downloadProgress,
+  onDownload,
+  isFavorite,
+  onToggleFavorite
+}) => {
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    onDownload(exercise);
+  };
+
+  const handleFavorite = (e) => {
+    e.stopPropagation();
+    onToggleFavorite(exercise);
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.exerciseCard, { backgroundColor: theme.cardBackground }, style]}
+      onPress={() => onPress(exercise)}
+      activeOpacity={0.8}
+    >
+      <View style={styles.exerciseImageContainer}>
+        <Image
+          source={
+            exercise.thumbnail_url
+              ? { uri: exercise.thumbnail_url }
+              : require('../../assets/placeholder1.jpg')
+          }
+          style={styles.exerciseImage}
+          defaultSource={require('../../assets/placeholder1.jpg')}
+        />
+        <View style={styles.playOverlay}>
+          <Ionicons name="play-circle" size={32} color="white" />
+        </View>
+        <View style={styles.durationBadge}>
+          <Text style={styles.durationText}>{exercise.duration}</Text>
+        </View>
+        {/* Favorite Button - Top Left */}
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={handleFavorite}
+        >
+          <View style={[styles.favoriteIconContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={16}
+              color={isFavorite ? "#ff6b6b" : "white"}
+            />
+          </View>
+        </TouchableOpacity>
+        {/* Download Button */}
+        <TouchableOpacity
+          style={styles.downloadButton}
+          onPress={handleDownload}
+          disabled={isDownloaded(exercise.id) || isDownloading(exercise.id)}
+        >
+          {isDownloading(exercise.id) ? (
+            <View style={styles.downloadProgressContainer}>
+              <View style={styles.downloadProgressCircle}>
+                <View
+                  style={[
+                    styles.downloadProgressFill,
+                    {
+                      width: `${(downloadProgress[exercise.id] || 0) * 100}%`,
+                      backgroundColor: theme.primary
+                    }
+                  ]}
+                />
+              </View>
+              <Text style={styles.downloadProgressText}>
+                {Math.round((downloadProgress[exercise.id] || 0) * 100)}%
+              </Text>
+            </View>
+          ) : isDownloaded(exercise.id) ? (
+            <View style={[styles.downloadIconContainer, { backgroundColor: '#4ade80' }]}>
+              <Ionicons name="checkmark" size={16} color="white" />
+            </View>
+          ) : (
+            <View style={[styles.downloadIconContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+              <Ionicons name="download-outline" size={16} color="white" />
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
-      <View style={styles.durationBadge}>
-        <Text style={styles.durationText}>{exercise.duration}</Text>
+      <View style={styles.exerciseInfo}>
+        <Text style={[styles.exerciseTitle, { color: theme.text }]} numberOfLines={2}>
+          {exercise.title}
+        </Text>
+        <Text style={[styles.exerciseDetails, { color: theme.textSecondary }]}>
+          {exercise.category} • {exercise.difficulty}
+        </Text>
+        <View style={styles.exerciseMeta}>
+          <Ionicons name="eye" size={12} color={theme.textSecondary} />
+          <Text style={[styles.exerciseViews, { color: theme.textSecondary }]}>{exercise.views || 0}</Text>
+        </View>
       </View>
-    </View>
-    <View style={styles.exerciseInfo}>
-      <Text style={styles.exerciseTitle} numberOfLines={2}>
-        {exercise.title}
-      </Text>
-      <Text style={styles.exerciseDetails}>
-        {exercise.category} • {exercise.difficulty}
-      </Text>
-      <View style={styles.exerciseMeta}>
-        <Ionicons name="eye" size={12} color="#666" />
-        <Text style={styles.exerciseViews}>{exercise.views || 0}</Text>
-      </View>
-    </View>
-  </TouchableOpacity>
-));
+    </TouchableOpacity>
+  );
+});
 
 // Memoized Category Card Component
-const CategoryCard = React.memo(({ icon, color, title, onPress }) => (
+const CategoryCard = React.memo(({ icon, color, title, onPress, theme }) => (
   <TouchableOpacity style={styles.categoryCard} onPress={onPress}>
     <View style={[styles.categoryIcon, { backgroundColor: color }]}>
       <Ionicons name={icon} size={24} color={color.replace('20', '')} />
     </View>
-    <Text style={styles.categoryText}>{title}</Text>
+    <Text style={[styles.categoryText, { color: theme.text }]}>{title}</Text>
   </TouchableOpacity>
 ));
 
@@ -203,6 +331,22 @@ const CategoryCard = React.memo(({ icon, color, title, onPress }) => (
 function Home() {
   const navigation = useNavigation();
   const { user, userProfile, signOut, isAdmin } = useAuth();
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const {
+    isDownloaded,
+    isDownloading,
+    downloadProgress,
+    getDownloadedVideoUri,
+    downloadVideo
+  } = useDownload();
+  const { favorites, isFavorite, toggleFavorite } = useFavorites();
+  const {
+    history,
+    addWorkout,
+    getWeeklyStats,
+    getStreak,
+    getTotalWorkoutTime
+  } = useWorkoutHistory();
   const [exercises, setExercises] = useState([]);
   const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -210,6 +354,8 @@ function Home() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
   // Memoized values
   const firstName = useMemo(() => {
@@ -238,6 +384,13 @@ function Home() {
     }
   }, [user]);
 
+  // Reload stats when workout history changes
+  useEffect(() => {
+    if (user) {
+      loadUserStats();
+    }
+  }, [history, loadUserStats, user]);
+
   const loadData = useCallback(async () => {
     if (!user) return;
     
@@ -264,18 +417,27 @@ function Home() {
 
   const loadUserStats = useCallback(async () => {
     try {
-      // This should be replaced with actual API call
+      // Get real data from workout history
+      const weeklyStats = getWeeklyStats();
+      const streak = getStreak();
+      const totalTime = getTotalWorkoutTime();
+      const totalWorkouts = history.length;
+
+      // Calculate weekly progress in minutes
+      const weeklyProgress = weeklyStats.reduce((sum, day) => sum + day.minutes, 0);
+      const weeklyGoal = 150; // This could be stored in user preferences
+
       setUserStats({
-        totalWorkouts: 24,
-        totalMinutes: 720,
-        currentStreak: 5,
-        weeklyGoal: 150,
-        weeklyProgress: 90
+        totalWorkouts,
+        totalMinutes: totalTime,
+        currentStreak: streak,
+        weeklyGoal,
+        weeklyProgress
       });
     } catch (error) {
       console.error('Error loading user stats:', error);
     }
-  }, []);
+  }, [getWeeklyStats, getStreak, getTotalWorkoutTime, history]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -327,39 +489,62 @@ function Home() {
     console.log('Category pressed:', category);
   }, []);
 
+  const handleDownloadExercise = useCallback(async (exercise) => {
+    try {
+      await downloadVideo(exercise);
+    } catch (error) {
+      console.error('Download error:', error);
+      Alert.alert('Download Failed', 'Failed to download video. Please try again.');
+    }
+  }, [downloadVideo]);
+
+  const handleEditProfile = useCallback(() => {
+    setShowEditProfile(true);
+  }, []);
+
+  const handleCloseEditProfile = useCallback(() => {
+    setShowEditProfile(false);
+  }, []);
+
+  const handleSaveProfile = useCallback(async () => {
+    setShowEditProfile(false);
+    // Refresh user data
+    await loadData();
+  }, [loadData]);
+
   const renderQuickStats = useMemo(() => {
     if (!userStats) return null;
 
     return (
-      <View style={styles.quickStatsCard}>
-        <Text style={styles.quickStatsTitle}>This Week</Text>
-        <View style={styles.progressBar}>
+      <View style={[styles.quickStatsCard, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.quickStatsTitle, { color: theme.text }]}>This Week</Text>
+        <View style={[styles.progressBar, { backgroundColor: theme.inputBackground }]}>
           <View style={[
-            styles.progressFill, 
-            { width: `${Math.min((userStats.weeklyProgress / userStats.weeklyGoal) * 100, 100)}%` }
+            styles.progressFill,
+            { width: `${Math.min((userStats.weeklyProgress / userStats.weeklyGoal) * 100, 100)}%`, backgroundColor: theme.primary }
           ]} />
         </View>
-        <Text style={styles.progressText}>
+        <Text style={[styles.progressText, { color: theme.textSecondary }]}>
           {userStats.weeklyProgress} / {userStats.weeklyGoal} minutes
         </Text>
-        
+
         <View style={styles.quickStatsRow}>
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatNumber}>{userStats.currentStreak}</Text>
-            <Text style={styles.quickStatLabel}>Day Streak</Text>
+            <Text style={[styles.quickStatNumber, { color: theme.primary }]}>{userStats.currentStreak}</Text>
+            <Text style={[styles.quickStatLabel, { color: theme.textSecondary }]}>Day Streak</Text>
           </View>
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatNumber}>{userStats.totalWorkouts}</Text>
-            <Text style={styles.quickStatLabel}>Workouts</Text>
+            <Text style={[styles.quickStatNumber, { color: theme.primary }]}>{userStats.totalWorkouts}</Text>
+            <Text style={[styles.quickStatLabel, { color: theme.textSecondary }]}>Workouts</Text>
           </View>
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatNumber}>{Math.floor(userStats.totalMinutes / 60)}h</Text>
-            <Text style={styles.quickStatLabel}>Total Time</Text>
+            <Text style={[styles.quickStatNumber, { color: theme.primary }]}>{Math.floor(userStats.totalMinutes / 60)}h</Text>
+            <Text style={[styles.quickStatLabel, { color: theme.textSecondary }]}>Total Time</Text>
           </View>
         </View>
       </View>
     );
-  }, [userStats]);
+  }, [userStats, theme]);
 
   const renderHomeContent = () => (
     <ScrollView 
@@ -372,15 +557,15 @@ function Home() {
       {/* Welcome Section */}
       <View style={styles.welcomeSection}>
         <View style={styles.welcomeText}>
-          <Text style={styles.welcomeTitle}>
+          <Text style={[styles.welcomeTitle, { color: theme.text }]}>
             Good {timeOfDay}, {firstName}! 💪
           </Text>
-          <Text style={styles.welcomeSubtitle}>
+          <Text style={[styles.welcomeSubtitle, { color: theme.textSecondary }]}>
             Ready for your next workout?
           </Text>
         </View>
-        <TouchableOpacity style={styles.profileAvatar}>
-          <Ionicons name="person" size={24} color="#4e7bff" />
+        <TouchableOpacity style={[styles.profileAvatar, { backgroundColor: theme.primary + '20' }]}>
+          <Ionicons name="person" size={24} color={theme.primary} />
         </TouchableOpacity>
       </View>
 
@@ -390,23 +575,30 @@ function Home() {
       {/* Featured Exercises */}
       <View style={styles.featuredSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Popular Workouts</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Popular Workouts</Text>
           <TouchableOpacity onPress={() => setActiveTab('workouts')}>
-            <Text style={styles.seeAllText}>See All</Text>
+            <Text style={[styles.seeAllText, { color: theme.primary }]}>See All</Text>
           </TouchableOpacity>
         </View>
-        
+
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4e7bff" />
+            <ActivityIndicator size="large" color={theme.primary} />
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.exerciseScroll}>
             {featuredExercises.map((exercise, index) => (
-              <ExerciseCard 
+              <ExerciseCard
                 key={exercise.id || index}
                 exercise={exercise}
                 onPress={handlePlayExercise}
+                theme={theme}
+                isDownloaded={isDownloaded}
+                isDownloading={isDownloading}
+                downloadProgress={downloadProgress}
+                onDownload={handleDownloadExercise}
+                isFavorite={isFavorite(exercise.id)}
+                onToggleFavorite={toggleFavorite}
                 style={index === featuredExercises.length - 1 ? { marginRight: 20 } : null}
               />
             ))}
@@ -416,7 +608,7 @@ function Home() {
 
       {/* Categories */}
       <View style={styles.categoriesSection}>
-        <Text style={styles.sectionTitle}>Categories</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Categories</Text>
         <View style={styles.categoriesGrid}>
           {categories.map((category, index) => (
             <CategoryCard
@@ -424,6 +616,7 @@ function Home() {
               icon={category.icon}
               color={category.color}
               title={category.title}
+              theme={theme}
               onPress={() => handleCategoryPress(category.title)}
             />
           ))}
@@ -432,15 +625,15 @@ function Home() {
 
       {/* Admin Access */}
       {isAdmin() && (
-        <TouchableOpacity style={styles.adminCard} onPress={navigateToAdmin}>
+        <TouchableOpacity style={[styles.adminCard, { backgroundColor: theme.cardBackground }]} onPress={navigateToAdmin}>
           <View style={styles.adminIcon}>
             <Ionicons name="settings" size={24} color="#6c5ce7" />
           </View>
           <View style={styles.adminText}>
-            <Text style={styles.adminTitle}>Admin Dashboard</Text>
-            <Text style={styles.adminSubtitle}>Manage exercises and users</Text>
+            <Text style={[styles.adminTitle, { color: theme.text }]}>Admin Dashboard</Text>
+            <Text style={[styles.adminSubtitle, { color: theme.textSecondary }]}>Manage exercises and users</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#666" />
+          <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
         </TouchableOpacity>
       )}
 
@@ -448,29 +641,50 @@ function Home() {
     </ScrollView>
   );
 
-  const renderWorkoutsContent = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>My Workouts</Text>
-      
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4e7bff" />
+  const renderWorkoutsContent = () => {
+    // Filter exercises based on favorites toggle
+    const displayedExercises = showFavoritesOnly
+      ? exercises.filter(exercise => isFavorite(exercise.id))
+      : exercises;
+
+    return (
+      <ScrollView style={styles.content}>
+        <View style={styles.workoutsHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>My Workouts</Text>
+          <TouchableOpacity
+            style={[styles.filterButton, { backgroundColor: showFavoritesOnly ? theme.primary : theme.cardBackground, borderColor: theme.border }]}
+            onPress={() => setShowFavoritesOnly(!showFavoritesOnly)}
+          >
+            <Ionicons
+              name={showFavoritesOnly ? "heart" : "heart-outline"}
+              size={18}
+              color={showFavoritesOnly ? "white" : theme.textSecondary}
+            />
+            <Text style={[styles.filterButtonText, { color: showFavoritesOnly ? "white" : theme.textSecondary }]}>
+              Favorites
+            </Text>
+          </TouchableOpacity>
         </View>
-      ) : exercises.length > 0 ? (
-        exercises.map((exercise, index) => (
-          <TouchableOpacity 
-            key={exercise.id || index} 
-            style={styles.workoutListCard}
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+          </View>
+        ) : displayedExercises.length > 0 ? (
+          displayedExercises.map((exercise, index) => (
+          <TouchableOpacity
+            key={exercise.id || index}
+            style={[styles.workoutListCard, { backgroundColor: theme.cardBackground }]}
             onPress={() => handlePlayExercise(exercise)}
             activeOpacity={0.8}
           >
             <View style={styles.workoutImageContainer}>
-              <Image 
+              <Image
                 source={
-                  exercise.thumbnail_url 
+                  exercise.thumbnail_url
                     ? { uri: exercise.thumbnail_url }
                     : require('../../assets/placeholder1.jpg')
-                } 
+                }
                 style={styles.workoutListImage}
                 defaultSource={require('../../assets/placeholder1.jpg')}
               />
@@ -479,141 +693,237 @@ function Home() {
               </View>
             </View>
             <View style={styles.workoutListInfo}>
-              <Text style={styles.workoutListTitle} numberOfLines={2}>
+              <Text style={[styles.workoutListTitle, { color: theme.text }]} numberOfLines={2}>
                 {exercise.title}
               </Text>
-              <Text style={styles.workoutListDetails}>
+              <Text style={[styles.workoutListDetails, { color: theme.textSecondary }]}>
                 {exercise.category} • {exercise.duration} • {exercise.difficulty}
               </Text>
               <View style={styles.workoutListMeta}>
-                <Ionicons name="eye" size={14} color="#666" />
-                <Text style={styles.workoutListViews}>{exercise.views || 0} views</Text>
+                <Ionicons name="eye" size={14} color={theme.textSecondary} />
+                <Text style={[styles.workoutListViews, { color: theme.textSecondary }]}>{exercise.views || 0} views</Text>
               </View>
             </View>
+            {/* Favorite Button */}
+            <TouchableOpacity
+              style={styles.workoutFavoriteButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleFavorite(exercise);
+              }}
+            >
+              <Ionicons
+                name={isFavorite(exercise.id) ? "heart" : "heart-outline"}
+                size={24}
+                color={isFavorite(exercise.id) ? "#ff6b6b" : theme.textSecondary}
+              />
+            </TouchableOpacity>
+            {/* Download Button */}
+            <TouchableOpacity
+              style={styles.workoutDownloadButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDownloadExercise(exercise);
+              }}
+              disabled={isDownloaded(exercise.id) || isDownloading(exercise.id)}
+            >
+              {isDownloading(exercise.id) ? (
+                <View style={styles.downloadingIndicator}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                  <Text style={[styles.downloadProgressTextSmall, { color: theme.textSecondary }]}>
+                    {Math.round((downloadProgress[exercise.id] || 0) * 100)}%
+                  </Text>
+                </View>
+              ) : isDownloaded(exercise.id) ? (
+                <Ionicons name="checkmark-circle" size={24} color="#4ade80" />
+              ) : (
+                <Ionicons name="download-outline" size={24} color={theme.textSecondary} />
+              )}
+            </TouchableOpacity>
           </TouchableOpacity>
         ))
       ) : (
         <View style={styles.emptyWorkouts}>
-          <Ionicons name="barbell-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyWorkoutsText}>No workouts available</Text>
-          <Text style={styles.emptyWorkoutsSubtext}>Check back later for new exercises</Text>
+          <Ionicons name={showFavoritesOnly ? "heart-outline" : "barbell-outline"} size={64} color={theme.border} />
+          <Text style={[styles.emptyWorkoutsText, { color: theme.textSecondary }]}>
+            {showFavoritesOnly ? "No favorites yet" : "No workouts available"}
+          </Text>
+          <Text style={[styles.emptyWorkoutsSubtext, { color: theme.textTertiary }]}>
+            {showFavoritesOnly ? "Tap the heart icon on workouts to add them to favorites" : "Check back later for new exercises"}
+          </Text>
         </View>
       )}
-    </ScrollView>
-  );
+      </ScrollView>
+    );
+  };
 
-  const renderProgressContent = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>Your Progress</Text>
-      
-      {/* Weekly Progress Chart */}
-      <View style={styles.progressCard}>
-        <Text style={styles.cardTitle}>This Week's Activity</Text>
-        <View style={styles.weeklyChart}>
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
-            <View key={day} style={styles.dayColumn}>
-              <View style={[styles.dayBar, { height: Math.random() * 60 + 20 }]} />
-              <Text style={styles.dayLabel}>{day}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+  const renderProgressContent = () => {
+    // Get real weekly stats
+    const weeklyStats = getWeeklyStats();
+    const maxMinutes = Math.max(...weeklyStats.map(day => day.minutes), 1);
+    const streak = getStreak();
+    const totalWorkouts = history.length;
 
-      {/* Achievements */}
-      <View style={styles.achievementsCard}>
-        <Text style={styles.cardTitle}>Recent Achievements</Text>
-        <View style={styles.achievementsList}>
-          <View style={styles.achievementItem}>
-            <View style={styles.achievementIcon}>
-              <Ionicons name="flame" size={20} color="#ff6b6b" />
-            </View>
-            <View style={styles.achievementText}>
-              <Text style={styles.achievementTitle}>5 Day Streak!</Text>
-              <Text style={styles.achievementDate}>Today</Text>
-            </View>
-          </View>
-          <View style={styles.achievementItem}>
-            <View style={styles.achievementIcon}>
-              <Ionicons name="trophy" size={20} color="#ffd700" />
-            </View>
-            <View style={styles.achievementText}>
-              <Text style={styles.achievementTitle}>First Workout Complete</Text>
-              <Text style={styles.achievementDate}>3 days ago</Text>
-            </View>
+    // Generate achievements based on real data
+    const achievements = [];
+
+    if (streak >= 3) {
+      achievements.push({
+        icon: 'flame',
+        color: '#ff6b6b',
+        title: `${streak} Day Streak!`,
+        date: 'Active now'
+      });
+    }
+
+    if (totalWorkouts >= 1) {
+      achievements.push({
+        icon: 'trophy',
+        color: '#ffd700',
+        title: totalWorkouts === 1 ? 'First Workout Complete' : `${totalWorkouts} Workouts Complete`,
+        date: history.length > 0 ? new Date(history[history.length - 1].completedAt).toLocaleDateString() : ''
+      });
+    }
+
+    if (totalWorkouts >= 10) {
+      achievements.push({
+        icon: 'star',
+        color: '#4ecdc4',
+        title: '10 Workout Milestone',
+        date: 'Achievement unlocked'
+      });
+    }
+
+    return (
+      <ScrollView style={styles.content}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Progress</Text>
+
+        {/* Weekly Progress Chart */}
+        <View style={[styles.progressCard, { backgroundColor: theme.cardBackground }]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>This Week's Activity</Text>
+          <View style={styles.weeklyChart}>
+            {weeklyStats.map((dayStat, index) => {
+              const barHeight = maxMinutes > 0 ? (dayStat.minutes / maxMinutes) * 60 + 20 : 20;
+              return (
+                <View key={index} style={styles.dayColumn}>
+                  <View style={[styles.dayBar, { height: barHeight, backgroundColor: theme.primary }]} />
+                  <Text style={[styles.dayLabel, { color: theme.textSecondary }]}>{dayStat.day}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Achievements */}
+        <View style={[styles.achievementsCard, { backgroundColor: theme.cardBackground }]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Recent Achievements</Text>
+          {achievements.length > 0 ? (
+            <View style={styles.achievementsList}>
+              {achievements.map((achievement, index) => (
+                <View key={index} style={styles.achievementItem}>
+                  <View style={[styles.achievementIcon, { backgroundColor: theme.background }]}>
+                    <Ionicons name={achievement.icon} size={20} color={achievement.color} />
+                  </View>
+                  <View style={styles.achievementText}>
+                    <Text style={[styles.achievementTitle, { color: theme.text }]}>{achievement.title}</Text>
+                    <Text style={[styles.achievementDate, { color: theme.textSecondary }]}>{achievement.date}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyAchievements}>
+              <Text style={[styles.emptyAchievementsText, { color: theme.textSecondary }]}>
+                Complete workouts to earn achievements!
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderDownloadsContent = () => (
+    <View style={styles.content}>
+      <Downloads />
+    </View>
   );
 
   const renderSettingsContent = () => (
     <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>Settings</Text>
-      
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Settings</Text>
+
       {/* Profile Section */}
-      <View style={styles.settingsCard}>
-        <Text style={styles.settingsCardTitle}>Profile</Text>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="person-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Edit Profile</Text>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+      <View style={[styles.settingsCard, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.settingsCardTitle, { color: theme.text }]}>Profile</Text>
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]} onPress={handleEditProfile}>
+          <Ionicons name="person-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Edit Profile</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.border} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="notifications-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Notifications</Text>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="notifications-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Notifications</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.border} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="lock-closed-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Privacy</Text>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="lock-closed-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Privacy</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.border} />
         </TouchableOpacity>
       </View>
 
       {/* App Settings */}
-      <View style={styles.settingsCard}>
-        <Text style={styles.settingsCardTitle}>App Settings</Text>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="moon-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Dark Mode</Text>
-          <View style={styles.toggle}>
-            <View style={styles.toggleInactive} />
+      <View style={[styles.settingsCard, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.settingsCardTitle, { color: theme.text }]}>App Settings</Text>
+        <TouchableOpacity
+          style={[styles.settingsItem, { borderBottomColor: theme.border }]}
+          onPress={toggleTheme}
+        >
+          <Ionicons name="moon-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Dark Mode</Text>
+          <View style={[styles.toggle, { backgroundColor: isDarkMode ? theme.primary : theme.border }]}>
+            <View style={[
+              styles.toggleInactive,
+              { backgroundColor: theme.cardBackground },
+              isDarkMode && styles.toggleActive
+            ]} />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="language-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Language</Text>
-          <Text style={styles.settingsItemValue}>English</Text>
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="language-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Language</Text>
+          <Text style={[styles.settingsItemValue, { color: theme.textSecondary }]}>English</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="download-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Download Quality</Text>
-          <Text style={styles.settingsItemValue}>High</Text>
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="download-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Download Quality</Text>
+          <Text style={[styles.settingsItemValue, { color: theme.textSecondary }]}>High</Text>
         </TouchableOpacity>
       </View>
 
       {/* Support */}
-      <View style={styles.settingsCard}>
-        <Text style={styles.settingsCardTitle}>Support</Text>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="help-circle-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Help Center</Text>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+      <View style={[styles.settingsCard, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.settingsCardTitle, { color: theme.text }]}>Support</Text>
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="help-circle-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Help Center</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.border} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="chatbubble-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Contact Us</Text>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="chatbubble-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Contact Us</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.border} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsItem}>
-          <Ionicons name="star-outline" size={20} color="#666" />
-          <Text style={styles.settingsItemText}>Rate App</Text>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+        <TouchableOpacity style={[styles.settingsItem, { borderBottomColor: theme.border }]}>
+          <Ionicons name="star-outline" size={20} color={theme.textSecondary} />
+          <Text style={[styles.settingsItemText, { color: theme.text }]}>Rate App</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.border} />
         </TouchableOpacity>
       </View>
 
       {/* Account */}
-      <View style={styles.settingsCard}>
+      <View style={[styles.settingsCard, { backgroundColor: theme.cardBackground }]}>
         <TouchableOpacity style={[styles.settingsItem, styles.logoutItem]} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color="#ff6b6b" />
           <Text style={[styles.settingsItemText, styles.logoutText]}>Logout</Text>
@@ -632,6 +942,8 @@ function Home() {
         return renderWorkoutsContent();
       case 'progress':
         return renderProgressContent();
+      case 'downloads':
+        return renderDownloadsContent();
       case 'settings':
         return renderSettingsContent();
       default:
@@ -640,14 +952,14 @@ function Home() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
         <View style={styles.headerContent}>
-          <Text style={styles.appTitle}>Abios Academy</Text>
+          <Text style={[styles.appTitle, { color: theme.text }]}>Abios Academy</Text>
           {userProfile?.role && (
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>
+            <View style={[styles.roleBadge, { backgroundColor: theme.primary + '20' }]}>
+              <Text style={[styles.roleText, { color: theme.primary }]}>
                 {userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1)}
               </Text>
             </View>
@@ -663,66 +975,101 @@ function Home() {
         visible={showVideoModal}
         exercise={selectedExercise}
         onClose={handleCloseVideo}
+        theme={theme}
+        isDownloaded={isDownloaded}
+        isDownloading={isDownloading}
+        downloadProgress={downloadProgress}
+        getDownloadedVideoUri={getDownloadedVideoUri}
+        downloadVideo={downloadVideo}
+        addWorkout={addWorkout}
       />
 
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={showEditProfile}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCloseEditProfile}
+      >
+        <EditProfile
+          onClose={handleCloseEditProfile}
+          onSave={handleSaveProfile}
+        />
+      </Modal>
+
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity 
-          style={[styles.navItem, activeTab === 'home' && styles.activeNavItem]}
+      <View style={[styles.bottomNav, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+        <TouchableOpacity
+          style={[styles.navItem, activeTab === 'home' && [styles.activeNavItem, { backgroundColor: theme.primary + '10' }]]}
           onPress={() => setActiveTab('home')}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name={activeTab === 'home' ? 'home' : 'home-outline'} 
-            size={24} 
-            color={activeTab === 'home' ? '#4e7bff' : '#999'} 
+          <Ionicons
+            name={activeTab === 'home' ? 'home' : 'home-outline'}
+            size={24}
+            color={activeTab === 'home' ? theme.primary : theme.textTertiary}
           />
-          <Text style={[styles.navText, activeTab === 'home' && styles.activeNavText]}>
+          <Text style={[styles.navText, { color: theme.textTertiary }, activeTab === 'home' && [styles.activeNavText, { color: theme.primary }]]}>
             Home
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.navItem, activeTab === 'workouts' && styles.activeNavItem]}
+        <TouchableOpacity
+          style={[styles.navItem, activeTab === 'workouts' && [styles.activeNavItem, { backgroundColor: theme.primary + '10' }]]}
           onPress={() => setActiveTab('workouts')}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name={activeTab === 'workouts' ? 'barbell' : 'barbell-outline'} 
-            size={24} 
-            color={activeTab === 'workouts' ? '#4e7bff' : '#999'} 
+          <Ionicons
+            name={activeTab === 'workouts' ? 'barbell' : 'barbell-outline'}
+            size={24}
+            color={activeTab === 'workouts' ? theme.primary : theme.textTertiary}
           />
-          <Text style={[styles.navText, activeTab === 'workouts' && styles.activeNavText]}>
+          <Text style={[styles.navText, { color: theme.textTertiary }, activeTab === 'workouts' && [styles.activeNavText, { color: theme.primary }]]}>
             Workouts
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.navItem, activeTab === 'progress' && styles.activeNavItem]}
+        <TouchableOpacity
+          style={[styles.navItem, activeTab === 'progress' && [styles.activeNavItem, { backgroundColor: theme.primary + '10' }]]}
           onPress={() => setActiveTab('progress')}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name={activeTab === 'progress' ? 'stats-chart' : 'stats-chart-outline'} 
-            size={24} 
-            color={activeTab === 'progress' ? '#4e7bff' : '#999'} 
+          <Ionicons
+            name={activeTab === 'progress' ? 'stats-chart' : 'stats-chart-outline'}
+            size={24}
+            color={activeTab === 'progress' ? theme.primary : theme.textTertiary}
           />
-          <Text style={[styles.navText, activeTab === 'progress' && styles.activeNavText]}>
+          <Text style={[styles.navText, { color: theme.textTertiary }, activeTab === 'progress' && [styles.activeNavText, { color: theme.primary }]]}>
             Progress
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.navItem, activeTab === 'settings' && styles.activeNavItem]}
+        <TouchableOpacity
+          style={[styles.navItem, activeTab === 'downloads' && [styles.activeNavItem, { backgroundColor: theme.primary + '10' }]]}
+          onPress={() => setActiveTab('downloads')}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={activeTab === 'downloads' ? 'download' : 'download-outline'}
+            size={24}
+            color={activeTab === 'downloads' ? theme.primary : theme.textTertiary}
+          />
+          <Text style={[styles.navText, { color: theme.textTertiary }, activeTab === 'downloads' && [styles.activeNavText, { color: theme.primary }]]}>
+            Downloads
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navItem, activeTab === 'settings' && [styles.activeNavItem, { backgroundColor: theme.primary + '10' }]]}
           onPress={() => setActiveTab('settings')}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name={activeTab === 'settings' ? 'settings' : 'settings-outline'} 
-            size={24} 
-            color={activeTab === 'settings' ? '#4e7bff' : '#999'} 
+          <Ionicons
+            name={activeTab === 'settings' ? 'settings' : 'settings-outline'}
+            size={24}
+            color={activeTab === 'settings' ? theme.primary : theme.textTertiary}
           />
-          <Text style={[styles.navText, activeTab === 'settings' && styles.activeNavText]}>
+          <Text style={[styles.navText, { color: theme.textTertiary }, activeTab === 'settings' && [styles.activeNavText, { color: theme.primary }]]}>
             Settings
           </Text>
         </TouchableOpacity>
@@ -1375,6 +1722,111 @@ const styles = StyleSheet.create({
     activeNavText: {
         color: '#4e7bff',
         fontWeight: '600',
+    },
+
+    // Download Button Styles
+    downloadButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        zIndex: 10,
+    },
+    // Favorite Button Styles
+    favoriteButton: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        zIndex: 10,
+    },
+    favoriteIconContainer: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    downloadIconContainer: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    downloadProgressContainer: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    downloadProgressCircle: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        overflow: 'hidden',
+    },
+    downloadProgressFill: {
+        height: '100%',
+        borderRadius: 12,
+    },
+    downloadProgressText: {
+        position: 'absolute',
+        fontSize: 8,
+        color: 'white',
+        fontWeight: 'bold',
+    },
+    headerDownloadButton: {
+        marginLeft: 12,
+        padding: 4,
+    },
+    downloadingIndicator: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    workoutDownloadButton: {
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    downloadProgressTextSmall: {
+        fontSize: 10,
+        marginTop: 4,
+    },
+    // Workouts Header and Filter Styles
+    workoutsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    filterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        gap: 6,
+    },
+    filterButtonText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    workoutFavoriteButton: {
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Empty Achievements Styles
+    emptyAchievements: {
+        paddingVertical: 20,
+        alignItems: 'center',
+    },
+    emptyAchievementsText: {
+        fontSize: 14,
+        textAlign: 'center',
     },
 });
 
