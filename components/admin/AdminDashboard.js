@@ -1,14 +1,14 @@
 // src/components/admin/AdminDashboard.js
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  Image, 
-  TextInput, 
-  Alert, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  TextInput,
+  Alert,
   Platform,
   Modal,
   ActivityIndicator,
@@ -19,12 +19,14 @@ import { MaterialIcons, FontAwesome, Ionicons, Entypo, Feather } from '@expo/vec
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { dbService, storageService } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
 const AdminDashboard = () => {
   const { user, userProfile, signOut } = useAuth();
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [exercises, setExercises] = useState([]);
   const [users, setUsers] = useState([]);
@@ -47,7 +49,7 @@ const AdminDashboard = () => {
     thumbnail: null,
     tags: ''
   });
-  
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -56,7 +58,22 @@ const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
 
+  // Edit exercise states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingExercise, setEditingExercise] = useState(null);
+  const [editExercise, setEditExercise] = useState({
+    title: '',
+    category: '',
+    duration: '',
+    difficulty: 'Beginner',
+    description: '',
+    video: null,
+    thumbnail: null,
+    tags: ''
+  });
+
   const categories = ['All', 'Strength', 'Cardio', 'Yoga', 'HIIT', 'Pilates', 'Flexibility'];
+  const styles = createStyles(theme);
 
   useEffect(() => {
     loadDashboardData();
@@ -306,6 +323,174 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleEditExercise = (exercise) => {
+    setEditingExercise(exercise);
+    setEditExercise({
+      title: exercise.title,
+      category: exercise.category,
+      duration: exercise.duration,
+      difficulty: exercise.difficulty,
+      description: exercise.description || '',
+      video: null, // Will be optional for edit
+      thumbnail: null, // Will be optional for edit
+      tags: exercise.tags ? exercise.tags.join(', ') : ''
+    });
+    setShowEditModal(true);
+  };
+
+  const pickEditVideo = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'video/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const video = result.assets[0];
+
+        // Check file size (limit to 100MB)
+        if (video.size > 100 * 1024 * 1024) {
+          Alert.alert('File too large', 'Please select a video smaller than 100MB');
+          return;
+        }
+
+        setEditExercise({...editExercise, video});
+      }
+    } catch (err) {
+      console.log('Error picking video:', err);
+      Alert.alert('Error', 'Failed to select video');
+    }
+  };
+
+  const pickEditThumbnail = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setEditExercise({...editExercise, thumbnail: result.assets[0]});
+      }
+    } catch (err) {
+      console.log('Error picking thumbnail:', err);
+      Alert.alert('Error', 'Failed to select thumbnail');
+    }
+  };
+
+  const handleUpdateExercise = async () => {
+    if (!editExercise.title || !editExercise.category || !editExercise.duration) {
+      Alert.alert('Missing Information', 'Please fill all required fields');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      let videoUrl = editingExercise.video_url;
+      let thumbnailUrl = editingExercise.thumbnail_url;
+      let videoPath = editingExercise.video_path;
+      let thumbnailPath = editingExercise.thumbnail_path;
+
+      // Upload new video if selected
+      if (editExercise.video) {
+        setUploadProgress(20);
+        const timestamp = Date.now();
+        const videoFileName = `video_${timestamp}_${editExercise.video.name}`;
+
+        const videoResult = await storageService.uploadExerciseVideo(
+          editExercise.video,
+          videoFileName
+        );
+
+        if (videoResult.error) {
+          throw new Error('Failed to upload video: ' + videoResult.error.message);
+        }
+
+        videoUrl = videoResult.data.publicUrl;
+        videoPath = videoResult.data.path;
+        setUploadProgress(60);
+      }
+
+      // Upload new thumbnail if selected
+      if (editExercise.thumbnail) {
+        const timestamp = Date.now();
+        const thumbnailFileName = `thumbnail_${timestamp}.jpg`;
+
+        const thumbnailResult = await storageService.uploadExerciseThumbnail(
+          editExercise.thumbnail,
+          thumbnailFileName
+        );
+
+        if (thumbnailResult.error) {
+          console.warn('Thumbnail upload failed:', thumbnailResult.error);
+        } else {
+          thumbnailUrl = thumbnailResult.data.publicUrl;
+          thumbnailPath = thumbnailResult.data.path;
+        }
+        setUploadProgress(80);
+      }
+
+      // Update exercise in database
+      const exerciseData = {
+        title: editExercise.title.trim(),
+        description: editExercise.description.trim(),
+        category: editExercise.category,
+        duration: editExercise.duration,
+        difficulty: editExercise.difficulty,
+        video_url: videoUrl,
+        thumbnail_url: thumbnailUrl,
+        video_path: videoPath,
+        thumbnail_path: thumbnailPath,
+        tags: editExercise.tags ? editExercise.tags.split(',').map(tag => tag.trim()) : []
+      };
+
+      const { error } = await dbService.updateExercise(editingExercise.id, exerciseData);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setUploadProgress(100);
+
+      // Update local state
+      setExercises(exercises.map(ex =>
+        ex.id === editingExercise.id
+          ? { ...ex, ...exerciseData }
+          : ex
+      ));
+
+      // Reset form
+      setEditExercise({
+        title: '',
+        category: '',
+        duration: '',
+        difficulty: 'Beginner',
+        description: '',
+        video: null,
+        thumbnail: null,
+        tags: ''
+      });
+      setEditingExercise(null);
+
+      setShowEditModal(false);
+      Alert.alert('Success', 'Exercise updated successfully!');
+
+      // Refresh data
+      await loadDashboardData();
+
+    } catch (error) {
+      console.error('Update error:', error);
+      Alert.alert('Update Failed', error.message || 'Failed to update exercise');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   const handleSignOut = async () => {
     Alert.alert(
       'Sign Out',
@@ -339,7 +524,7 @@ const AdminDashboard = () => {
       
       {/* Enhanced Stats Grid */}
       <View style={styles.statsContainer}>
-        <View style={[styles.statCard, styles.statCardLarge, {backgroundColor: '#4e7bff'}]}>
+        <View style={[styles.statCard, styles.statCardLarge, {backgroundColor: theme.primary}]}>
           <View style={styles.statHeader}>
             <Ionicons name="people" size={32} color="white" />
             <View style={styles.statTrend}>
@@ -351,20 +536,20 @@ const AdminDashboard = () => {
           <Text style={styles.statLabel}>Total Users</Text>
           <Text style={styles.statSubtext}>{stats.activeUsers} active this week</Text>
         </View>
-        
-        <View style={[styles.statCard, {backgroundColor: '#ff6b6b'}]}>
+
+        <View style={[styles.statCard, {backgroundColor: theme.error}]}>
           <Ionicons name="barbell" size={28} color="white" />
           <Text style={styles.statNumber}>{stats.exercises}</Text>
           <Text style={styles.statLabel}>Exercises</Text>
         </View>
-        
-        <View style={[styles.statCard, {backgroundColor: '#6bdb7d'}]}>
+
+        <View style={[styles.statCard, {backgroundColor: theme.success}]}>
           <Ionicons name="eye" size={28} color="white" />
           <Text style={styles.statNumber}>{stats.totalViews}</Text>
           <Text style={styles.statLabel}>Total Views</Text>
         </View>
-        
-        <View style={[styles.statCard, {backgroundColor: '#ffb347'}]}>
+
+        <View style={[styles.statCard, {backgroundColor: theme.warning}]}>
           <Ionicons name="cloud-upload" size={28} color="white" />
           <Text style={styles.statNumber}>{stats.todayUploads}</Text>
           <Text style={styles.statLabel}>Today's Uploads</Text>
@@ -384,17 +569,17 @@ const AdminDashboard = () => {
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.quickActionCard}>
-            <Ionicons name="analytics" size={24} color="#4e7bff" />
+            <Ionicons name="analytics" size={24} color={theme.primary} />
             <Text style={styles.quickActionText}>View Analytics</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.quickActionCard}>
-            <Ionicons name="people" size={24} color="#4e7bff" />
+            <Ionicons name="people" size={24} color={theme.primary} />
             <Text style={styles.quickActionText}>Manage Users</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.quickActionCard}>
-            <Ionicons name="settings" size={24} color="#4e7bff" />
+            <Ionicons name="settings" size={24} color={theme.primary} />
             <Text style={styles.quickActionText}>Settings</Text>
           </TouchableOpacity>
         </View>
@@ -409,11 +594,11 @@ const AdminDashboard = () => {
       {/* Search and Filter Header */}
       <View style={styles.exerciseHeader}>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={theme.textTertiary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search exercises..."
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -480,8 +665,8 @@ const AdminDashboard = () => {
                 <View style={[styles.exerciseTag, styles.difficultyTag]}>
                   <Text style={[
                     styles.exerciseDifficulty,
-                    {color: exercise.difficulty === 'Beginner' ? '#6bdb7d' : 
-                            exercise.difficulty === 'Intermediate' ? '#ffb347' : '#ff6b6b'}
+                    {color: exercise.difficulty === 'Beginner' ? theme.success :
+                            exercise.difficulty === 'Intermediate' ? theme.warning : theme.error}
                   ]}>
                     {exercise.difficulty}
                   </Text>
@@ -489,11 +674,11 @@ const AdminDashboard = () => {
               </View>
               <View style={styles.exerciseStats}>
                 <View style={styles.exerciseStat}>
-                  <Ionicons name="eye" size={14} color="#777" />
+                  <Ionicons name="eye" size={14} color={theme.textSecondary} />
                   <Text style={styles.exerciseStatText}>{exercise.views || 0}</Text>
                 </View>
                 <View style={styles.exerciseStat}>
-                  <Ionicons name="calendar" size={14} color="#777" />
+                  <Ionicons name="calendar" size={14} color={theme.textSecondary} />
                   <Text style={styles.exerciseStatText}>
                     {new Date(exercise.created_at).toLocaleDateString()}
                   </Text>
@@ -502,16 +687,19 @@ const AdminDashboard = () => {
             </View>
             <View style={styles.exerciseActions}>
               <TouchableOpacity style={styles.actionButton}>
-                <FontAwesome name="play" size={16} color="#4e7bff" />
+                <FontAwesome name="play" size={16} color={theme.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <FontAwesome name="pencil" size={16} color="#ffb347" />
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleEditExercise(exercise)}
+              >
+                <FontAwesome name="pencil" size={16} color={theme.warning} />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionButton} 
+              <TouchableOpacity
+                style={styles.actionButton}
                 onPress={() => handleDeleteExercise(exercise.id)}
               >
-                <FontAwesome name="trash" size={16} color="#ff6b6b" />
+                <FontAwesome name="trash" size={16} color={theme.error} />
               </TouchableOpacity>
             </View>
           </View>
@@ -519,13 +707,13 @@ const AdminDashboard = () => {
         
         {filteredExercises.length === 0 && !loading && (
           <View style={styles.emptyState}>
-            <Ionicons name="barbell-outline" size={64} color="#ccc" />
+            <Ionicons name="barbell-outline" size={64} color={theme.border} />
             <Text style={styles.emptyStateText}>
               {searchQuery || filterCategory !== 'All' ? 'No exercises found' : 'No exercises yet'}
             </Text>
             <Text style={styles.emptyStateSubtext}>
-              {searchQuery || filterCategory !== 'All' 
-                ? 'Try adjusting your search or filter' 
+              {searchQuery || filterCategory !== 'All'
+                ? 'Try adjusting your search or filter'
                 : 'Upload your first exercise to get started'
               }
             </Text>
@@ -546,7 +734,7 @@ const AdminDashboard = () => {
       <View style={styles.modalContainer}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={() => setShowUploadModal(false)}>
-            <Ionicons name="close" size={24} color="#777" />
+            <Ionicons name="close" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>Upload Exercise</Text>
           <View style={{width: 24}} />
@@ -557,10 +745,11 @@ const AdminDashboard = () => {
           <TextInput
             style={styles.input}
             placeholder="Enter exercise name"
+            placeholderTextColor={theme.textTertiary}
             value={newExercise.title}
             onChangeText={text => setNewExercise({...newExercise, title: text})}
           />
-          
+
           <Text style={styles.inputLabel}>Category*</Text>
           <ScrollView 
             horizontal 
@@ -590,10 +779,11 @@ const AdminDashboard = () => {
           <TextInput
             style={styles.input}
             placeholder="e.g., 15 min, 30 min"
+            placeholderTextColor={theme.textTertiary}
             value={newExercise.duration}
             onChangeText={text => setNewExercise({...newExercise, duration: text})}
           />
-          
+
           <Text style={styles.inputLabel}>Difficulty Level*</Text>
           <View style={styles.difficultyContainer}>
             {['Beginner', 'Intermediate', 'Advanced'].map(level => (
@@ -619,29 +809,31 @@ const AdminDashboard = () => {
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Describe the exercise, form tips, benefits..."
+            placeholderTextColor={theme.textTertiary}
             multiline
             numberOfLines={4}
             value={newExercise.description}
             onChangeText={text => setNewExercise({...newExercise, description: text})}
           />
-          
+
           <Text style={styles.inputLabel}>Tags (comma-separated)</Text>
           <TextInput
             style={styles.input}
             placeholder="e.g., upper body, core, beginner-friendly"
+            placeholderTextColor={theme.textTertiary}
             value={newExercise.tags}
             onChangeText={text => setNewExercise({...newExercise, tags: text})}
           />
           
           <Text style={styles.inputLabel}>Exercise Video*</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.uploadButton, newExercise.video && styles.uploadButtonSuccess]}
             onPress={pickVideo}
           >
-            <Ionicons 
-              name={newExercise.video ? "checkmark-circle" : "videocam"} 
-              size={24} 
-              color={newExercise.video ? "#6bdb7d" : "#4e7bff"} 
+            <Ionicons
+              name={newExercise.video ? "checkmark-circle" : "videocam"}
+              size={24}
+              color={newExercise.video ? theme.success : theme.primary}
             />
             <View style={styles.uploadButtonContent}>
               <Text style={[styles.uploadButtonText, newExercise.video && styles.uploadButtonTextSuccess]}>
@@ -652,16 +844,16 @@ const AdminDashboard = () => {
               )}
             </View>
           </TouchableOpacity>
-          
+
           <Text style={styles.inputLabel}>Thumbnail Image</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.uploadButton, newExercise.thumbnail && styles.uploadButtonSuccess]}
             onPress={pickThumbnail}
           >
-            <Ionicons 
-              name={newExercise.thumbnail ? "checkmark-circle" : "image"} 
-              size={24} 
-              color={newExercise.thumbnail ? "#6bdb7d" : "#4e7bff"} 
+            <Ionicons
+              name={newExercise.thumbnail ? "checkmark-circle" : "image"}
+              size={24}
+              color={newExercise.thumbnail ? theme.success : theme.primary}
             />
             <Text style={[styles.uploadButtonText, newExercise.thumbnail && styles.uploadButtonTextSuccess]}>
               {newExercise.thumbnail ? 'Thumbnail Selected' : 'Select Thumbnail (Optional)'}
@@ -703,10 +895,194 @@ const AdminDashboard = () => {
     </Modal>
   );
 
+  const renderEditModal = () => (
+    <Modal
+      visible={showEditModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={() => {
+            setShowEditModal(false);
+            setEditingExercise(null);
+          }}>
+            <Ionicons name="close" size={24} color={theme.textSecondary} />
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Edit Exercise</Text>
+          <View style={{width: 24}} />
+        </View>
+
+        <ScrollView style={styles.uploadForm} showsVerticalScrollIndicator={false}>
+          <Text style={styles.inputLabel}>Exercise Title*</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter exercise name"
+            placeholderTextColor={theme.textTertiary}
+            value={editExercise.title}
+            onChangeText={text => setEditExercise({...editExercise, title: text})}
+          />
+
+          <Text style={styles.inputLabel}>Category*</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categorySelector}
+          >
+            {categories.slice(1).map(category => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categorySelectorButton,
+                  editExercise.category === category && styles.selectedCategory
+                ]}
+                onPress={() => setEditExercise({...editExercise, category})}
+              >
+                <Text style={[
+                  styles.categorySelectorText,
+                  editExercise.category === category && styles.selectedCategoryText
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.inputLabel}>Duration*</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., 15 min, 30 min"
+            placeholderTextColor={theme.textTertiary}
+            value={editExercise.duration}
+            onChangeText={text => setEditExercise({...editExercise, duration: text})}
+          />
+
+          <Text style={styles.inputLabel}>Difficulty Level*</Text>
+          <View style={styles.difficultyContainer}>
+            {['Beginner', 'Intermediate', 'Advanced'].map(level => (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.difficultyButton,
+                  editExercise.difficulty === level && styles.selectedDifficulty
+                ]}
+                onPress={() => setEditExercise({...editExercise, difficulty: level})}
+              >
+                <Text style={[
+                  styles.difficultyText,
+                  editExercise.difficulty === level && styles.selectedDifficultyText
+                ]}>
+                  {level}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.inputLabel}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Describe the exercise, form tips, benefits..."
+            placeholderTextColor={theme.textTertiary}
+            multiline
+            numberOfLines={4}
+            value={editExercise.description}
+            onChangeText={text => setEditExercise({...editExercise, description: text})}
+          />
+
+          <Text style={styles.inputLabel}>Tags (comma-separated)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., upper body, core, beginner-friendly"
+            placeholderTextColor={theme.textTertiary}
+            value={editExercise.tags}
+            onChangeText={text => setEditExercise({...editExercise, tags: text})}
+          />
+
+          <Text style={styles.inputLabel}>Update Video (Optional)</Text>
+          <TouchableOpacity
+            style={[styles.uploadButton, editExercise.video && styles.uploadButtonSuccess]}
+            onPress={pickEditVideo}
+          >
+            <Ionicons
+              name={editExercise.video ? "checkmark-circle" : "videocam"}
+              size={24}
+              color={editExercise.video ? theme.success : theme.primary}
+            />
+            <View style={styles.uploadButtonContent}>
+              <Text style={[styles.uploadButtonText, editExercise.video && styles.uploadButtonTextSuccess]}>
+                {editExercise.video ? 'New Video Selected' : 'Keep Current Video'}
+              </Text>
+              {editExercise.video && (
+                <Text style={styles.fileName}>{editExercise.video.name}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <Text style={styles.inputLabel}>Update Thumbnail (Optional)</Text>
+          <TouchableOpacity
+            style={[styles.uploadButton, editExercise.thumbnail && styles.uploadButtonSuccess]}
+            onPress={pickEditThumbnail}
+          >
+            <Ionicons
+              name={editExercise.thumbnail ? "checkmark-circle" : "image"}
+              size={24}
+              color={editExercise.thumbnail ? theme.success : theme.primary}
+            />
+            <Text style={[styles.uploadButtonText, editExercise.thumbnail && styles.uploadButtonTextSuccess]}>
+              {editExercise.thumbnail ? 'New Thumbnail Selected' : 'Keep Current Thumbnail'}
+            </Text>
+          </TouchableOpacity>
+
+          {editExercise.thumbnail && (
+            <Image source={{uri: editExercise.thumbnail.uri}} style={styles.thumbnailPreview} />
+          )}
+
+          {/* Current thumbnail preview if no new one selected */}
+          {!editExercise.thumbnail && editingExercise?.thumbnail_url && (
+            <View>
+              <Text style={styles.inputLabel}>Current Thumbnail</Text>
+              <Image
+                source={{uri: editingExercise.thumbnail_url}}
+                style={styles.thumbnailPreview}
+              />
+            </View>
+          )}
+
+          {/* Upload Progress */}
+          {uploading && (
+            <View style={styles.uploadProgress}>
+              <Text style={styles.uploadProgressText}>Updating... {uploadProgress}%</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, {width: `${uploadProgress}%`}]} />
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.submitButton, uploading && styles.submitButtonDisabled]}
+            onPress={handleUpdateExercise}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Ionicons name="save" size={20} color="white" />
+                <Text style={styles.submitButtonText}>Update Exercise</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={{height: 50}} />
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4e7bff" />
+        <ActivityIndicator size="large" color={theme.primary} />
         <Text style={styles.loadingText}>Loading dashboard...</Text>
       </View>
     );
@@ -723,11 +1099,11 @@ const AdminDashboard = () => {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications" size={24} color="#333" />
+            <Ionicons name="notifications" size={24} color={theme.text} />
             <View style={styles.notificationBadge} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.profileButton} onPress={handleSignOut}>
-            <FontAwesome name="sign-out" size={24} color="#ff6b6b" />
+            <FontAwesome name="sign-out" size={24} color={theme.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -738,14 +1114,14 @@ const AdminDashboard = () => {
         {activeTab === 'exercises' && renderExercises()}
         {activeTab === 'users' && (
           <View style={styles.placeholderContainer}>
-            <Feather name="users" size={48} color="#4e7bff" />
+            <Feather name="users" size={48} color={theme.primary} />
             <Text style={styles.placeholderText}>User Management</Text>
             <Text style={styles.placeholderSubtext}>View and manage all users</Text>
           </View>
         )}
         {activeTab === 'analytics' && (
           <View style={styles.placeholderContainer}>
-            <Feather name="bar-chart-2" size={48} color="#4e7bff" />
+            <Feather name="bar-chart-2" size={48} color={theme.primary} />
             <Text style={styles.placeholderText}>Analytics Dashboard</Text>
             <Text style={styles.placeholderSubtext}>View platform insights and metrics</Text>
           </View>
@@ -753,11 +1129,14 @@ const AdminDashboard = () => {
       </View>
       
       {/* Bottom Navigation Bar */}
-      <BottomTabBar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
+      <BottomTabBar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
+
       {/* Upload Modal */}
       {renderUploadModal()}
-      
+
+      {/* Edit Modal */}
+      {renderEditModal()}
+
       {/* Floating Action Button */}
       {activeTab === 'exercises' && !showUploadModal && (
         <TouchableOpacity 
@@ -772,13 +1151,15 @@ const AdminDashboard = () => {
 };
 
 // Bottom Navigation Bar Component
-const BottomTabBar = ({ activeTab, setActiveTab }) => {
+const BottomTabBar = ({ activeTab, setActiveTab, theme }) => {
   const tabs = [
     { id: 'dashboard', icon: 'grid', label: 'Dashboard' },
     { id: 'exercises', icon: 'barbell', label: 'Exercises' },
     { id: 'users', icon: 'people', label: 'Users' },
     { id: 'analytics', icon: 'stats-chart', label: 'Analytics' },
   ];
+
+  const styles = createStyles(theme);
 
   return (
     <View style={styles.tabContainer}>
@@ -791,7 +1172,7 @@ const BottomTabBar = ({ activeTab, setActiveTab }) => {
           <Ionicons
             name={activeTab === tab.id ? tab.icon : `${tab.icon}-outline`}
             size={24}
-            color={activeTab === tab.id ? '#4e7bff' : '#777'}
+            color={activeTab === tab.id ? theme.primary : theme.textSecondary}
           />
           <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
             {tab.label}
@@ -802,21 +1183,21 @@ const BottomTabBar = ({ activeTab, setActiveTab }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.background,
   },
   loadingText: {
     marginTop: 15,
     fontSize: 16,
-    color: '#666',
+    color: theme.textSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -824,9 +1205,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 50,
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -837,16 +1218,16 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
   },
   adminTitle: {
     fontSize: 16,
-    color: '#777',
+    color: theme.textSecondary,
     marginTop: 4,
   },
   userInfo: {
     fontSize: 12,
-    color: '#4e7bff',
+    color: theme.primary,
     marginTop: 2,
   },
   headerRight: {
@@ -864,7 +1245,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#ff6b6b',
+    backgroundColor: theme.error,
   },
   profileButton: {},
   contentContainer: {
@@ -880,7 +1261,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
     marginBottom: 20,
     marginTop: 10,
   },
@@ -955,7 +1336,7 @@ const styles = StyleSheet.create({
   },
   quickActionCard: {
     width: (width - 60) / 2,
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
@@ -967,7 +1348,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   primaryAction: {
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     width: width - 40,
     flexDirection: 'row',
     justifyContent: 'center',
@@ -981,14 +1362,14 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#4e7bff',
+    color: theme.primary,
     marginTop: 8,
     textAlign: 'center',
   },
   
   // Activity Section
   activityContainer: {
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -1001,7 +1382,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.border,
   },
   activityIcon: {
     width: 44,
@@ -1016,19 +1397,19 @@ const styles = StyleSheet.create({
   },
   activityText: {
     fontSize: 16,
-    color: '#333',
+    color: theme.text,
     marginBottom: 4,
     fontWeight: '500',
   },
   activityTime: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textTertiary,
   },
   
   // Exercises Section
   exercisesContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.background,
   },
   exerciseHeader: {
     flexDirection: 'row',
@@ -1041,7 +1422,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderRadius: 12,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -1057,13 +1438,13 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: theme.text,
   },
   addButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1085,7 +1466,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -1093,11 +1474,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   activeCategoryFilter: {
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
   },
   categoryFilterText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSecondary,
     fontWeight: '500',
   },
   activeCategoryFilterText: {
@@ -1110,7 +1491,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   exerciseCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderRadius: 16,
     padding: 16,
     marginBottom: 15,
@@ -1134,12 +1515,12 @@ const styles = StyleSheet.create({
   exerciseTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 6,
   },
   exerciseDescription: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSecondary,
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -1153,16 +1534,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.inputBackground,
   },
   exerciseCategory: {
     fontSize: 12,
-    color: '#4e7bff',
+    color: theme.primary,
     fontWeight: '500',
   },
   exerciseDuration: {
     fontSize: 12,
-    color: '#6bdb7d',
+    color: theme.success,
     fontWeight: '500',
   },
   difficultyTag: {
@@ -1183,7 +1564,7 @@ const styles = StyleSheet.create({
   },
   exerciseStatText: {
     fontSize: 12,
-    color: '#777',
+    color: theme.textSecondary,
   },
   exerciseActions: {
     gap: 10,
@@ -1193,7 +1574,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1208,13 +1589,13 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
+    color: theme.textSecondary,
     marginTop: 20,
     textAlign: 'center',
   },
   emptyStateSubtext: {
     fontSize: 16,
-    color: '#999',
+    color: theme.textTertiary,
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 22,
@@ -1223,7 +1604,7 @@ const styles = StyleSheet.create({
   // Upload Modal
   modalContainer: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1233,12 +1614,12 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
   },
   uploadForm: {
     flex: 1,
@@ -1247,18 +1628,18 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
     marginTop: 20,
   },
   input: {
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.inputBackground,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#333',
+    color: theme.text,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.inputBorder,
   },
   textArea: {
     height: 100,
@@ -1273,24 +1654,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.inputBackground,
     marginRight: 10,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.inputBorder,
   },
   selectedCategory: {
-    backgroundColor: '#4e7bff',
-    borderColor: '#4e7bff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   categorySelectorText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSecondary,
     fontWeight: '500',
   },
   selectedCategoryText: {
     color: 'white',
   },
-  
+
   // Difficulty Selector
   difficultyContainer: {
     flexDirection: 'row',
@@ -1303,17 +1684,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.inputBackground,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.inputBorder,
     alignItems: 'center',
   },
   selectedDifficulty: {
-    backgroundColor: '#4e7bff',
-    borderColor: '#4e7bff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   difficultyText: {
-    color: '#666',
+    color: theme.textSecondary,
     fontWeight: '500',
     fontSize: 14,
   },
@@ -1325,17 +1706,17 @@ const styles = StyleSheet.create({
   uploadButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fd',
+    backgroundColor: theme.inputBackground,
     borderRadius: 12,
     padding: 16,
     marginVertical: 10,
     borderWidth: 2,
-    borderColor: '#f0f0f0',
+    borderColor: theme.inputBorder,
     borderStyle: 'dashed',
   },
   uploadButtonSuccess: {
-    backgroundColor: '#f0f8f1',
-    borderColor: '#6bdb7d',
+    backgroundColor: theme.isDark ? 'rgba(107, 219, 125, 0.15)' : '#f0f8f1',
+    borderColor: theme.success,
     borderStyle: 'solid',
   },
   uploadButtonContent: {
@@ -1343,16 +1724,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   uploadButtonText: {
-    color: '#4e7bff',
+    color: theme.primary,
     fontWeight: '500',
     fontSize: 16,
   },
   uploadButtonTextSuccess: {
-    color: '#6bdb7d',
+    color: theme.success,
   },
   fileName: {
     fontSize: 12,
-    color: '#777',
+    color: theme.textSecondary,
     marginTop: 4,
   },
   thumbnailPreview: {
@@ -1367,31 +1748,31 @@ const styles = StyleSheet.create({
   uploadProgress: {
     marginVertical: 20,
     padding: 16,
-    backgroundColor: '#f0f5ff',
+    backgroundColor: theme.isDark ? 'rgba(78, 123, 255, 0.15)' : '#f0f5ff',
     borderRadius: 12,
   },
   uploadProgressText: {
     fontSize: 14,
-    color: '#4e7bff',
+    color: theme.primary,
     fontWeight: '500',
     marginBottom: 8,
     textAlign: 'center',
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.1)' : '#e0e0e0',
     borderRadius: 3,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     borderRadius: 3,
   },
-  
+
   // Submit Button
   submitButton: {
     flexDirection: 'row',
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
@@ -1404,7 +1785,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   submitButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.isDark ? '#555' : '#ccc',
   },
   submitButtonText: {
     color: 'white',
@@ -1423,24 +1804,24 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.text,
     marginTop: 20,
     textAlign: 'center',
   },
   placeholderSubtext: {
     fontSize: 16,
-    color: '#777',
+    color: theme.textSecondary,
     marginTop: 10,
     textAlign: 'center',
   },
-  
+
   // Bottom Navigation
   tabContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: 'white',
+    backgroundColor: theme.cardBackground,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.border,
     paddingVertical: 10,
     paddingBottom: 20,
     position: 'absolute',
@@ -1460,19 +1841,19 @@ const styles = StyleSheet.create({
     width: '25%',
   },
   activeTab: {
-    backgroundColor: '#eef4ff',
+    backgroundColor: theme.isDark ? 'rgba(78, 123, 255, 0.2)' : '#eef4ff',
   },
   tabText: {
     marginTop: 5,
     fontSize: 12,
-    color: '#777',
+    color: theme.textSecondary,
     fontWeight: '500',
   },
   activeTabText: {
-    color: '#4e7bff',
+    color: theme.primary,
     fontWeight: '600',
   },
-  
+
   // Floating Button
   floatingButton: {
     position: 'absolute',
@@ -1481,7 +1862,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4e7bff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
