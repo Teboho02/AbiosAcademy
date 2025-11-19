@@ -7,7 +7,8 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { DownloadProvider } from './contexts/DownloadContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { WorkoutHistoryProvider } from './contexts/WorkoutHistoryContext';
-
+import { useNavigation } from '@react-navigation/native';
+import { useState, useEffect } from 'react';
 import Login from './components/auth/login';
 import Signup from './components/auth/signup';
 import ForgotPassword from './components/auth/forgotPassword';
@@ -21,7 +22,20 @@ const Stack = createNativeStackNavigator();
 
 // Loading component
 const LoadingScreen = () => {
+  const navigation = useNavigation();
   const { theme } = useTheme();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Set a timeout for 10 seconds
+    const timeoutId = setTimeout(() => {
+      console.log('Loading timeout - navigating to Login');
+      navigation.navigate('Login');
+    }, 10000); // 10 seconds
+
+    // Cleanup timeout on component unmount
+    return () => clearTimeout(timeoutId);
+  }, [navigation]);
 
   return (
     <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
