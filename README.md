@@ -76,7 +76,7 @@ Expo CLI
 Supabase project
 
 1. Clone the repository
-git clone https://github.com/your-username/abios-academy.git
+git clone https://github.com/Teboho02/abios-academy.git
 cd abios-academy
 
 2. Install dependencies
